@@ -1,0 +1,42 @@
+# --- secrets ---
+.env
+.env.*
+!.env.example
+
+# --- node ---
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Generated from vite.config.ts
+vite.config.js
+vite.config.d.ts
+
+# --- python ---
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- data + generated assets ---
+data/*.db
+data/generated_assets/
+output/
+tests/.tmp/
+
+# --- screenshots / scratch ---
+refactored-ui-*.png
+.playwright-cli/
+.playwright-mcp/
+
+# --- editor / OS ---
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# --- claude code (per-user only) ---
+.claude/settings.local.json

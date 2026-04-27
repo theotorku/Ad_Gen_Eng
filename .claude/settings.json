@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/TheoTorku/OneDrive/Desktop/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\TheoTorku\\OneDrive\\Desktop"
+    ]
+  }
+}
