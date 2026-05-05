@@ -63,6 +63,7 @@ That starts the FastAPI app through Uvicorn. For production, wrap the backend in
 Minimum runtime needs:
 
 - Python runtime compatible with the repo
+- dependencies from `requirements.txt`
 - access to environment variables
 - writable temp or asset directory only if local asset storage is still enabled
 - network access to any external providers you enable
@@ -94,6 +95,7 @@ Common backend settings:
 - `AD_ENGINE_DB_BACKEND`
 - `AD_ENGINE_SQLITE_PATH`
 - `AD_ENGINE_POSTGRES_DSN`
+- `AD_ENGINE_POSTGRES_POOL_SIZE`
 - `AD_ENGINE_REQUIRE_API_KEY`
 - `AD_ENGINE_API_KEYS`
 - `AD_ENGINE_PLANNING_PROVIDER`

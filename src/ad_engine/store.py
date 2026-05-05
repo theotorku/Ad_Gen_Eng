@@ -625,15 +625,22 @@ class PostgreSQLCampaignStore:
             raise ValueError("AD_ENGINE_POSTGRES_DSN is required when AD_ENGINE_DB_BACKEND=postgres.")
         try:
             import psycopg
+            from psycopg_pool import ConnectionPool
             from psycopg.rows import dict_row
         except ImportError as exc:
             raise RuntimeError(
-                "Postgres storage requires the optional 'psycopg[binary]' dependency."
+                "Postgres storage requires the optional 'psycopg[binary]' and 'psycopg_pool' dependencies."
             ) from exc
 
         self.dsn = dsn
         self._psycopg = psycopg
         self._row_factory = dict_row
+        self._pool = ConnectionPool(
+            conninfo=self.dsn,
+            kwargs={"row_factory": self._row_factory},
+            min_size=1,
+            max_size=int(os.getenv("AD_ENGINE_POSTGRES_POOL_SIZE", "5").strip() or "5"),
+        )
         self._lock = Lock()
         self._initialize_schema()
 
@@ -913,6 +920,12 @@ class PostgreSQLCampaignStore:
                 """
             )
             connection.execute(
+                """
+                ALTER TABLE campaigns
+                ADD COLUMN IF NOT EXISTS organization_id TEXT NOT NULL DEFAULT 'default'
+                """
+            )
+            connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at DESC)"
             )
             connection.execute(
@@ -923,7 +936,7 @@ class PostgreSQLCampaignStore:
             )
 
     def _connect(self):
-        return self._psycopg.connect(self.dsn, row_factory=self._row_factory)
+        return self._pool.connection()
 
     def _load_for_update(
         self,
