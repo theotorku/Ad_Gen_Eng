@@ -8,6 +8,9 @@ Install Python development dependencies before running the API or tests:
 pip install -r requirements-dev.txt
 ```
 
+Production runtimes should install `requirements.txt`; `requirements-dev.txt`
+adds test-only tooling on top.
+
 Common commands:
 
 ```powershell
@@ -29,7 +32,7 @@ npm run build
 There are two main development surfaces:
 
 - generation pipeline work in `src/ad_engine`
-- API work in `src/ad_engine/api.py` and `src/ad_engine/store.py`
+- API work in `src/ad_engine/fastapi_app.py` and `src/ad_engine/store.py`
 - dashboard work in `web/src`
 
 When changing generation behavior, the usual path is:
