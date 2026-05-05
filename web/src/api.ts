@@ -1,19 +1,26 @@
 import type { CampaignBrief, CampaignListResponse, CampaignRecord } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID ?? "default";
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "X-Organization-ID": ORGANIZATION_ID,
       ...(init?.headers ?? {}),
     },
   });
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(payload?.error ?? `Request failed with status ${response.status}`);
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: string;
+      error?: string;
+    } | null;
+    throw new Error(
+      payload?.error ?? payload?.detail ?? `Request failed with status ${response.status}`,
+    );
   }
 
   return (await response.json()) as T;

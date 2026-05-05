@@ -27,6 +27,7 @@ export const sampleVariant: AdVariant = {
 export function buildCampaign(overrides: Partial<CampaignRecord> = {}): CampaignRecord {
   return {
     id: "cmp_123",
+    organization_id: "default",
     created_at: "2025-01-15T10:30:00Z",
     updated_at: "2025-01-15T11:00:00Z",
     status: "draft",

@@ -2,12 +2,12 @@
 
 ## Overview
 
-The Ad Generation Engine is a small Python service that turns a structured campaign brief into a generated ad bundle. The project is intentionally lightweight and uses the standard library only, which keeps the MVP easy to run and easy to change.
+The Ad Generation Engine is a small Python service that turns a structured campaign brief into a generated ad bundle. The core generation engine is dependency-light, while the API surface now uses FastAPI/Uvicorn so the project has a production-shaped path toward SaaS hosting.
 
 The system currently supports two ways to use it:
 
 - CLI generation through [main.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/main.py>)
-- HTTP access through the API server in [src/ad_engine/api.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/api.py>)
+- HTTP access through the FastAPI app in [src/ad_engine/fastapi_app.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/fastapi_app.py>)
 
 ## Request Flow
 
@@ -29,8 +29,9 @@ The system currently supports two ways to use it:
 - [copywriter.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/copywriter.py>): default copy provider
 - [assets.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/assets.py>): default image prompt provider
 - [review.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/review.py>): quality checks
-- [store.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/store.py>): in-memory campaign persistence
-- [api.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/api.py>): REST API routes and request handling
+- [store.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/store.py>): memory, SQLite, and optional Postgres campaign persistence
+- [fastapi_app.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/fastapi_app.py>): FastAPI routes and app factory
+- [api.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/api.py>): legacy standard-library handler retained for compatibility coverage
 
 ## Provider Model
 
@@ -84,20 +85,18 @@ The main domain objects are:
 
 ## Persistence Model
 
-The persistence layer now supports two backends behind a shared campaign store interface:
+The persistence layer supports three backends behind a shared campaign store interface:
 
 - `memory` for fast local experimentation
 - `sqlite` for durable local SaaS MVP storage
+- `postgres` for shared SaaS environments, enabled with `AD_ENGINE_POSTGRES_DSN` and the optional `psycopg[binary]` dependency
 
-The SQLite store keeps a few searchable columns at the table level and stores the full campaign record as JSON. That keeps the schema small while letting the bundle shape evolve without frequent migrations.
+Each campaign record carries an `organization_id`. API callers scope reads and writes with the `X-Organization-ID` header; omitted headers resolve to the `default` local organization. This is not full authentication yet, but it creates the storage boundary needed for the next auth/workspace milestone.
 
-Likely future storage replacements:
-
-- Postgres for multi-user usage
-- object storage or file-backed snapshots for generated exports
+The SQLite and Postgres stores keep a few searchable columns at the table level and store the full campaign record as JSON. That keeps the schema small while letting the bundle shape evolve without frequent migrations.
 
 ## Design Notes
 
 - The engine stays deterministic by default so local testing is predictable.
-- API routes are intentionally small and synchronous.
+- API routes are intentionally small and synchronous for now; image generation should move behind background jobs before broad SaaS usage.
 - The project is organized so model-backed providers can be added without rewriting orchestration or route logic.

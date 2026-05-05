@@ -39,6 +39,21 @@ def test_get_returns_stored_campaign(bundle):
     assert fetched.campaign_id == stored.campaign_id
 
 
+def test_organization_scoping_isolates_campaigns(bundle):
+    store = InMemoryCampaignStore()
+    alpha = store.create(bundle, organization_id="alpha")
+    beta = store.create(bundle, organization_id="beta")
+
+    assert store.get(alpha.campaign_id, organization_id="alpha") is not None
+    assert store.get(alpha.campaign_id, organization_id="beta") is None
+    assert [item.campaign_id for item in store.list(organization_id="alpha")] == [
+        alpha.campaign_id
+    ]
+    assert [item.campaign_id for item in store.list(organization_id="beta")] == [
+        beta.campaign_id
+    ]
+
+
 def test_get_unknown_returns_none():
     store = InMemoryCampaignStore()
 
@@ -105,6 +120,20 @@ def test_sqlite_round_trip(bundle, local_tmp_path):
     assert fetched.campaign_id == stored.campaign_id
     assert fetched.bundle.brief.brand_name == bundle.brief.brand_name
     assert fetched.metadata == {"source": "test"}
+    assert fetched.organization_id == "default"
+
+
+def test_sqlite_organization_scoping_persists(bundle, local_tmp_path):
+    store = SQLiteCampaignStore(str(local_tmp_path / "ad_engine.db"))
+
+    alpha = store.create(bundle, organization_id="alpha")
+    store.create(bundle, organization_id="beta")
+
+    fresh = SQLiteCampaignStore(str(local_tmp_path / "ad_engine.db"))
+
+    assert fresh.get(alpha.campaign_id, organization_id="alpha") is not None
+    assert fresh.get(alpha.campaign_id, organization_id="beta") is None
+    assert len(fresh.list(organization_id="alpha")) == 1
 
 
 def test_sqlite_approve_persists(bundle, local_tmp_path):

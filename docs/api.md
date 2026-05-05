@@ -14,6 +14,10 @@ Start the server:
 python main.py serve
 ```
 
+The served app is FastAPI/Uvicorn. Requests are scoped to an organization with
+the optional `X-Organization-ID` header. When the header is omitted, the API uses
+the local compatibility organization: `default`.
+
 ## Endpoints
 
 ### `GET /health`
@@ -67,7 +71,7 @@ Use this route when a campaign variant includes a `generated_asset.path` value a
 
 ### `GET /campaigns`
 
-Lists every campaign in the configured campaign store.
+Lists campaigns in the selected organization.
 
 Example response shape:
 
@@ -134,6 +138,8 @@ The API returns `404 Not Found` when a campaign ID or route does not exist.
 ## Notes
 
 - Campaign persistence depends on the configured store backend.
+- Campaign records include `organization_id`.
+- Send `X-Organization-ID: <workspace-id>` to isolate campaign reads and writes by workspace.
 - `POST /bundles` is currently the campaign creation endpoint.
 - `GET /bundles/{id}` and `GET /campaigns/{id}` use the same underlying campaign ID.
 - Generated image files are saved on disk and exposed through `GET /generated-assets/{filename}` when `AD_ENGINE_IMAGE_PROVIDER=openai_images` is active.

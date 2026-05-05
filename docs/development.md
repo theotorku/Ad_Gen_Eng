@@ -2,7 +2,11 @@
 
 ## Local Setup
 
-The project currently uses only the Python standard library, so there is no dependency install step for the MVP.
+Install Python development dependencies before running the API or tests:
+
+```powershell
+pip install -r requirements-dev.txt
+```
 
 Common commands:
 
@@ -12,6 +16,7 @@ python main.py sample_brief.json
 python main.py serve
 python main.py serve 127.0.0.1 8011
 $env:AD_ENGINE_DB_BACKEND = 'sqlite'; python main.py serve
+$env:AD_ENGINE_DB_BACKEND = 'postgres'; $env:AD_ENGINE_POSTGRES_DSN = 'postgresql://user:pass@localhost:5432/ad_engine'; python main.py serve
 python -m compileall src main.py
 npm run dev
 npm run dev -- --host 127.0.0.1 --port 4174
@@ -37,7 +42,8 @@ When changing the API, the usual path is:
 
 1. start the server with `python main.py serve`
 2. exercise endpoints with `Invoke-RestMethod`
-3. verify the in-memory campaign lifecycle
+3. include `X-Organization-ID` when testing workspace isolation
+4. verify the in-memory campaign lifecycle
 
 If `8000` is already occupied by another local service, start the API on an alternate port and use that same port in any frontend `VITE_API_BASE_URL` override.
 
@@ -45,7 +51,8 @@ When changing persistence behavior, the usual path is:
 
 1. run once with `AD_ENGINE_DB_BACKEND=memory`
 2. run once with `AD_ENGINE_DB_BACKEND=sqlite`
-3. create a campaign, restart the API, and confirm it is still listed
+3. create a campaign under two different `X-Organization-ID` values and confirm isolation
+4. create a campaign, restart the API, and confirm it is still listed
 
 When changing the dashboard, the usual path is:
 
@@ -92,12 +99,13 @@ Current verification is lightweight and manual:
 - CLI execution for pipeline verification
 - local API calls for route verification
 - browser-based flow verification for create, save notes, and approve
+- FastAPI route tests for organization-scoped campaign access
 
 Good next testing additions:
 
 - unit tests for `CampaignBrief` validation
 - provider-level tests for deterministic outputs
-- API route tests against the configured campaign store
+- Postgres integration tests against a disposable database
 - frontend interaction tests for creation, selection, and approval flows
 
 ## Documentation Map

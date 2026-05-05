@@ -40,6 +40,10 @@ Run the API server:
 python main.py serve
 ```
 
+The server runs the FastAPI app through Uvicorn. The older standard-library
+handler remains in the repo for compatibility tests, but new API work should use
+[src/ad_engine/fastapi_app.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/fastapi_app.py>).
+
 Use a custom host or port when needed:
 
 ```powershell
@@ -189,11 +193,17 @@ Campaign storage now supports two backends:
 
 - `memory`: process-local storage, cleared on restart
 - `sqlite`: durable local storage in a SQLite database
+- `postgres`: shared production-style storage using `psycopg`
 
 Environment variables:
 
-- `AD_ENGINE_DB_BACKEND=memory|sqlite`
+- `AD_ENGINE_DB_BACKEND=memory|sqlite|postgres`
 - `AD_ENGINE_SQLITE_PATH=.\data\ad_engine.db`
+- `AD_ENGINE_POSTGRES_DSN=postgresql://...`
+
+Campaign records include `organization_id`. API clients can scope requests with
+the `X-Organization-ID` header; the dashboard sends `VITE_ORGANIZATION_ID` and
+defaults to `default` for local single-workspace development.
 
 ## Good next steps
 

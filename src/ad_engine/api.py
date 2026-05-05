@@ -17,6 +17,7 @@ from .store import StoreSettings, build_campaign_store
 MAX_REQUEST_BODY_BYTES = 1 * 1024 * 1024  # 1 MiB
 
 DEFAULT_CORS_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
+DEFAULT_ORGANIZATION_ID = "default"
 
 
 def _load_cors_origins() -> tuple[frozenset[str], bool]:
@@ -78,7 +79,9 @@ class AdApiHandler(BaseHTTPRequestHandler):
 
         if len(parts) == 2 and parts[0] == "bundles":
             campaign_id = parts[1]
-            stored = self.server.store.get(campaign_id)
+            stored = self.server.store.get(
+                campaign_id, organization_id=self._organization_id()
+            )
             if stored is None:
                 self._write_json(
                     HTTPStatus.NOT_FOUND,
@@ -90,15 +93,21 @@ class AdApiHandler(BaseHTTPRequestHandler):
             return
 
         if parts == ["campaigns"]:
-            campaigns = [campaign.to_dict()
-                         for campaign in self.server.store.list()]
+            campaigns = [
+                campaign.to_dict()
+                for campaign in self.server.store.list(
+                    organization_id=self._organization_id()
+                )
+            ]
             self._write_json(
                 HTTPStatus.OK, {"campaigns": campaigns, "count": len(campaigns)})
             return
 
         if len(parts) == 2 and parts[0] == "campaigns":
             campaign_id = parts[1]
-            stored = self.server.store.get(campaign_id)
+            stored = self.server.store.get(
+                campaign_id, organization_id=self._organization_id()
+            )
             if stored is None:
                 self._write_json(
                     HTTPStatus.NOT_FOUND,
@@ -127,7 +136,11 @@ class AdApiHandler(BaseHTTPRequestHandler):
             payload = self._read_json_body()
             bundle = self.server.engine.run(payload)
             metadata = self._campaign_metadata_from_brief(payload)
-            stored = self.server.store.create(bundle, metadata=metadata)
+            stored = self.server.store.create(
+                bundle,
+                metadata=metadata,
+                organization_id=self._organization_id(),
+            )
         except RequestBodyTooLargeError as exc:
             self._write_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {
                              "error": str(exc)})
@@ -155,6 +168,7 @@ class AdApiHandler(BaseHTTPRequestHandler):
             payload = self._read_json_body()
             stored = self.server.store.update(
                 campaign_id,
+                organization_id=self._organization_id(),
                 status=self._optional_string(payload, "status"),
                 approval_notes=self._optional_string(
                     payload, "approval_notes"),
@@ -222,6 +236,7 @@ class AdApiHandler(BaseHTTPRequestHandler):
                 campaign_id,
                 approval_notes=self._optional_string(
                     payload, "approval_notes"),
+                organization_id=self._organization_id(),
             )
         except RequestBodyTooLargeError as exc:
             self._write_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {
@@ -281,6 +296,11 @@ class AdApiHandler(BaseHTTPRequestHandler):
             "channels": payload.get("channels", []),
         }
 
+    def _organization_id(self) -> str:
+        raw = self.headers.get("X-Organization-ID", DEFAULT_ORGANIZATION_ID)
+        normalized = raw.strip()
+        return normalized or DEFAULT_ORGANIZATION_ID
+
     def _optional_string(self, payload: dict[str, Any], field: str) -> str | None:
         # Returns None when the field is omitted or explicitly null (no change
         # downstream). An empty or whitespace string is treated as an explicit
@@ -315,7 +335,9 @@ class AdApiHandler(BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.send_header("Access-Control-Allow-Methods",
                          "GET, POST, PATCH, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header(
+            "Access-Control-Allow-Headers", "Content-Type, X-Organization-ID"
+        )
 
     def _send_cors_headers(self) -> None:
         # Always advertise that responses vary by Origin so caches don't serve

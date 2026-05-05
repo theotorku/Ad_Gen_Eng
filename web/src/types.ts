@@ -54,6 +54,7 @@ export type CampaignStatus = "draft" | "approved";
 
 export type CampaignRecord = {
   id: string;
+  organization_id: string;
   created_at: string;
   updated_at: string;
   status: CampaignStatus;

@@ -21,6 +21,7 @@ CAMPAIGN_STATUSES = {"draft", "approved"}
 class StoreSettings:
     backend: str = "memory"
     sqlite_path: str = "data/ad_engine.db"
+    postgres_dsn: str = ""
 
     @classmethod
     def from_env(cls) -> "StoreSettings":
@@ -29,12 +30,14 @@ class StoreSettings:
                               "memory").strip() or "memory",
             sqlite_path=os.getenv(
                 "AD_ENGINE_SQLITE_PATH", "data/ad_engine.db").strip() or "data/ad_engine.db",
+            postgres_dsn=os.getenv("AD_ENGINE_POSTGRES_DSN", "").strip(),
         )
 
 
 @dataclass(slots=True)
 class StoredCampaign:
     campaign_id: str
+    organization_id: str
     created_at: str
     updated_at: str
     status: str
@@ -46,6 +49,7 @@ class StoredCampaign:
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.campaign_id,
+            "organization_id": self.organization_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "status": self.status,
@@ -59,26 +63,37 @@ class StoredCampaign:
 class CampaignStore(Protocol):
     backend_name: str
 
-    def create(self, bundle: AdBundle, metadata: dict[str, Any] | None = None) -> StoredCampaign:
+    def create(
+        self,
+        bundle: AdBundle,
+        metadata: dict[str, Any] | None = None,
+        organization_id: str = "default",
+    ) -> StoredCampaign:
         ...
 
-    def get(self, campaign_id: str) -> StoredCampaign | None:
+    def get(self, campaign_id: str, organization_id: str | None = None) -> StoredCampaign | None:
         ...
 
-    def list(self) -> list[StoredCampaign]:
+    def list(self, organization_id: str | None = None) -> list[StoredCampaign]:
         ...
 
     def update(
         self,
         campaign_id: str,
         *,
+        organization_id: str | None = None,
         status: str | None = None,
         approval_notes: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> StoredCampaign | None:
         ...
 
-    def approve(self, campaign_id: str, approval_notes: str | None = None) -> StoredCampaign | None:
+    def approve(
+        self,
+        campaign_id: str,
+        approval_notes: str | None = None,
+        organization_id: str | None = None,
+    ) -> StoredCampaign | None:
         ...
 
 
@@ -89,10 +104,16 @@ class InMemoryCampaignStore:
         self._items: dict[str, StoredCampaign] = {}
         self._lock = Lock()
 
-    def create(self, bundle: AdBundle, metadata: dict[str, Any] | None = None) -> StoredCampaign:
+    def create(
+        self,
+        bundle: AdBundle,
+        metadata: dict[str, Any] | None = None,
+        organization_id: str = "default",
+    ) -> StoredCampaign:
         now = _utc_now()
         stored = StoredCampaign(
             campaign_id=str(uuid4()),
+            organization_id=_normalize_organization_id(organization_id),
             created_at=now,
             updated_at=now,
             status="draft",
@@ -103,33 +124,52 @@ class InMemoryCampaignStore:
             self._items[stored.campaign_id] = stored
         return stored
 
-    def get(self, campaign_id: str) -> StoredCampaign | None:
+    def get(self, campaign_id: str, organization_id: str | None = None) -> StoredCampaign | None:
         with self._lock:
-            return self._items.get(campaign_id)
+            stored = self._items.get(campaign_id)
+        if stored is None or not _matches_organization(stored, organization_id):
+            return None
+        return stored
 
-    def list(self) -> list[StoredCampaign]:
+    def list(self, organization_id: str | None = None) -> list[StoredCampaign]:
         with self._lock:
-            return sorted(self._items.values(), key=lambda item: item.created_at, reverse=True)
+            items = [
+                item
+                for item in self._items.values()
+                if _matches_organization(item, organization_id)
+            ]
+        return sorted(items, key=lambda item: item.created_at, reverse=True)
 
     def update(
         self,
         campaign_id: str,
         *,
+        organization_id: str | None = None,
         status: str | None = None,
         approval_notes: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> StoredCampaign | None:
         with self._lock:
             stored = self._items.get(campaign_id)
-            if stored is None:
+            if stored is None or not _matches_organization(stored, organization_id):
                 return None
 
             _apply_campaign_updates(
                 stored, status=status, approval_notes=approval_notes, metadata=metadata)
             return stored
 
-    def approve(self, campaign_id: str, approval_notes: str | None = None) -> StoredCampaign | None:
-        return self.update(campaign_id, status="approved", approval_notes=approval_notes)
+    def approve(
+        self,
+        campaign_id: str,
+        approval_notes: str | None = None,
+        organization_id: str | None = None,
+    ) -> StoredCampaign | None:
+        return self.update(
+            campaign_id,
+            organization_id=organization_id,
+            status="approved",
+            approval_notes=approval_notes,
+        )
 
 
 class SQLiteCampaignStore:
@@ -141,10 +181,16 @@ class SQLiteCampaignStore:
         self._lock = Lock()
         self._initialize_schema()
 
-    def create(self, bundle: AdBundle, metadata: dict[str, Any] | None = None) -> StoredCampaign:
+    def create(
+        self,
+        bundle: AdBundle,
+        metadata: dict[str, Any] | None = None,
+        organization_id: str = "default",
+    ) -> StoredCampaign:
         now = _utc_now()
         stored = StoredCampaign(
             campaign_id=str(uuid4()),
+            organization_id=_normalize_organization_id(organization_id),
             created_at=now,
             updated_at=now,
             status="draft",
@@ -157,6 +203,7 @@ class SQLiteCampaignStore:
                 """
                 INSERT INTO campaigns (
                     id,
+                    organization_id,
                     brand_name,
                     product_name,
                     objective,
@@ -167,10 +214,11 @@ class SQLiteCampaignStore:
                     approval_notes,
                     metadata_json,
                     payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     stored.campaign_id,
+                    stored.organization_id,
                     stored.bundle.brief.brand_name,
                     stored.bundle.brief.product_name,
                     stored.bundle.brief.objective,
@@ -186,30 +234,51 @@ class SQLiteCampaignStore:
 
         return stored
 
-    def get(self, campaign_id: str) -> StoredCampaign | None:
+    def get(self, campaign_id: str, organization_id: str | None = None) -> StoredCampaign | None:
         with self._lock, closing(self._connect()) as connection:
-            row = connection.execute(
-                """
-                SELECT payload_json
-                FROM campaigns
-                WHERE id = ?
-                """,
-                (campaign_id,),
-            ).fetchone()
+            if organization_id is None:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = ?
+                    """,
+                    (campaign_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = ? AND organization_id = ?
+                    """,
+                    (campaign_id, _normalize_organization_id(organization_id)),
+                ).fetchone()
 
         if row is None:
             return None
         return _stored_campaign_from_payload(json.loads(row["payload_json"]))
 
-    def list(self) -> list[StoredCampaign]:
+    def list(self, organization_id: str | None = None) -> list[StoredCampaign]:
         with self._lock, closing(self._connect()) as connection:
-            rows = connection.execute(
-                """
-                SELECT payload_json
-                FROM campaigns
-                ORDER BY created_at DESC
-                """
-            ).fetchall()
+            if organization_id is None:
+                rows = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    ORDER BY created_at DESC
+                    """
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE organization_id = ?
+                    ORDER BY created_at DESC
+                    """,
+                    (_normalize_organization_id(organization_id),),
+                ).fetchall()
 
         return [_stored_campaign_from_payload(json.loads(row["payload_json"])) for row in rows]
 
@@ -217,19 +286,30 @@ class SQLiteCampaignStore:
         self,
         campaign_id: str,
         *,
+        organization_id: str | None = None,
         status: str | None = None,
         approval_notes: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> StoredCampaign | None:
         with self._lock, closing(self._connect()) as connection, connection:
-            row = connection.execute(
-                """
-                SELECT payload_json
-                FROM campaigns
-                WHERE id = ?
-                """,
-                (campaign_id,),
-            ).fetchone()
+            if organization_id is None:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = ?
+                    """,
+                    (campaign_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = ? AND organization_id = ?
+                    """,
+                    (campaign_id, _normalize_organization_id(organization_id)),
+                ).fetchone()
 
             if row is None:
                 return None
@@ -242,7 +322,8 @@ class SQLiteCampaignStore:
             connection.execute(
                 """
                 UPDATE campaigns
-                SET brand_name = ?,
+                SET organization_id = ?,
+                    brand_name = ?,
                     product_name = ?,
                     objective = ?,
                     status = ?,
@@ -254,6 +335,7 @@ class SQLiteCampaignStore:
                 WHERE id = ?
                 """,
                 (
+                    stored.organization_id,
                     stored.bundle.brief.brand_name,
                     stored.bundle.brief.product_name,
                     stored.bundle.brief.objective,
@@ -269,8 +351,18 @@ class SQLiteCampaignStore:
 
         return stored
 
-    def approve(self, campaign_id: str, approval_notes: str | None = None) -> StoredCampaign | None:
-        return self.update(campaign_id, status="approved", approval_notes=approval_notes)
+    def approve(
+        self,
+        campaign_id: str,
+        approval_notes: str | None = None,
+        organization_id: str | None = None,
+    ) -> StoredCampaign | None:
+        return self.update(
+            campaign_id,
+            organization_id=organization_id,
+            status="approved",
+            approval_notes=approval_notes,
+        )
 
     def _initialize_schema(self) -> None:
         with self._lock, closing(self._connect()) as connection:
@@ -280,6 +372,7 @@ class SQLiteCampaignStore:
                     """
                     CREATE TABLE IF NOT EXISTS campaigns (
                         id TEXT PRIMARY KEY,
+                        organization_id TEXT NOT NULL DEFAULT 'default',
                         brand_name TEXT NOT NULL,
                         product_name TEXT NOT NULL,
                         objective TEXT NOT NULL,
@@ -293,11 +386,22 @@ class SQLiteCampaignStore:
                     )
                     """
                 )
+                existing_columns = {
+                    row["name"]
+                    for row in connection.execute("PRAGMA table_info(campaigns)").fetchall()
+                }
+                if "organization_id" not in existing_columns:
+                    connection.execute(
+                        "ALTER TABLE campaigns ADD COLUMN organization_id TEXT NOT NULL DEFAULT 'default'"
+                    )
                 connection.execute(
                     "CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at DESC)"
                 )
                 connection.execute(
                     "CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status)"
+                )
+                connection.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_campaigns_org_created_at ON campaigns(organization_id, created_at DESC)"
                 )
 
     def _connect(self) -> sqlite3.Connection:
@@ -308,15 +412,244 @@ class SQLiteCampaignStore:
         return connection
 
 
+class PostgreSQLCampaignStore:
+    backend_name = "postgres"
+
+    def __init__(self, dsn: str) -> None:
+        if not dsn:
+            raise ValueError("AD_ENGINE_POSTGRES_DSN is required when AD_ENGINE_DB_BACKEND=postgres.")
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except ImportError as exc:
+            raise RuntimeError(
+                "Postgres storage requires the optional 'psycopg[binary]' dependency."
+            ) from exc
+
+        self.dsn = dsn
+        self._psycopg = psycopg
+        self._row_factory = dict_row
+        self._lock = Lock()
+        self._initialize_schema()
+
+    def create(
+        self,
+        bundle: AdBundle,
+        metadata: dict[str, Any] | None = None,
+        organization_id: str = "default",
+    ) -> StoredCampaign:
+        now = _utc_now()
+        stored = StoredCampaign(
+            campaign_id=str(uuid4()),
+            organization_id=_normalize_organization_id(organization_id),
+            created_at=now,
+            updated_at=now,
+            status="draft",
+            bundle=bundle,
+            metadata=metadata or {},
+        )
+
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO campaigns (
+                    id,
+                    organization_id,
+                    brand_name,
+                    product_name,
+                    objective,
+                    status,
+                    created_at,
+                    updated_at,
+                    approved_at,
+                    approval_notes,
+                    metadata_json,
+                    payload_json
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    stored.campaign_id,
+                    stored.organization_id,
+                    stored.bundle.brief.brand_name,
+                    stored.bundle.brief.product_name,
+                    stored.bundle.brief.objective,
+                    stored.status,
+                    stored.created_at,
+                    stored.updated_at,
+                    stored.approved_at,
+                    stored.approval_notes,
+                    json.dumps(stored.metadata),
+                    json.dumps(stored.to_dict()),
+                ),
+            )
+
+        return stored
+
+    def get(self, campaign_id: str, organization_id: str | None = None) -> StoredCampaign | None:
+        with self._lock, self._connect() as connection:
+            if organization_id is None:
+                row = connection.execute(
+                    "SELECT payload_json FROM campaigns WHERE id = %s",
+                    (campaign_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = %s AND organization_id = %s
+                    """,
+                    (campaign_id, _normalize_organization_id(organization_id)),
+                ).fetchone()
+
+        if row is None:
+            return None
+        return _stored_campaign_from_payload(_coerce_json_payload(row["payload_json"]))
+
+    def list(self, organization_id: str | None = None) -> list[StoredCampaign]:
+        with self._lock, self._connect() as connection:
+            if organization_id is None:
+                rows = connection.execute(
+                    "SELECT payload_json FROM campaigns ORDER BY created_at DESC"
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE organization_id = %s
+                    ORDER BY created_at DESC
+                    """,
+                    (_normalize_organization_id(organization_id),),
+                ).fetchall()
+
+        return [
+            _stored_campaign_from_payload(_coerce_json_payload(row["payload_json"]))
+            for row in rows
+        ]
+
+    def update(
+        self,
+        campaign_id: str,
+        *,
+        organization_id: str | None = None,
+        status: str | None = None,
+        approval_notes: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock, self._connect() as connection:
+            if organization_id is None:
+                row = connection.execute(
+                    "SELECT payload_json FROM campaigns WHERE id = %s",
+                    (campaign_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = %s AND organization_id = %s
+                    """,
+                    (campaign_id, _normalize_organization_id(organization_id)),
+                ).fetchone()
+
+            if row is None:
+                return None
+
+            stored = _stored_campaign_from_payload(_coerce_json_payload(row["payload_json"]))
+            _apply_campaign_updates(
+                stored, status=status, approval_notes=approval_notes, metadata=metadata)
+
+            connection.execute(
+                """
+                UPDATE campaigns
+                SET organization_id = %s,
+                    brand_name = %s,
+                    product_name = %s,
+                    objective = %s,
+                    status = %s,
+                    updated_at = %s,
+                    approved_at = %s,
+                    approval_notes = %s,
+                    metadata_json = %s,
+                    payload_json = %s
+                WHERE id = %s
+                """,
+                (
+                    stored.organization_id,
+                    stored.bundle.brief.brand_name,
+                    stored.bundle.brief.product_name,
+                    stored.bundle.brief.objective,
+                    stored.status,
+                    stored.updated_at,
+                    stored.approved_at,
+                    stored.approval_notes,
+                    json.dumps(stored.metadata),
+                    json.dumps(stored.to_dict()),
+                    stored.campaign_id,
+                ),
+            )
+
+        return stored
+
+    def approve(
+        self,
+        campaign_id: str,
+        approval_notes: str | None = None,
+        organization_id: str | None = None,
+    ) -> StoredCampaign | None:
+        return self.update(
+            campaign_id,
+            organization_id=organization_id,
+            status="approved",
+            approval_notes=approval_notes,
+        )
+
+    def _initialize_schema(self) -> None:
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS campaigns (
+                    id TEXT PRIMARY KEY,
+                    organization_id TEXT NOT NULL DEFAULT 'default',
+                    brand_name TEXT NOT NULL,
+                    product_name TEXT NOT NULL,
+                    objective TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    approved_at TEXT,
+                    approval_notes TEXT,
+                    metadata_json JSONB NOT NULL,
+                    payload_json JSONB NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at DESC)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_campaigns_org_created_at ON campaigns(organization_id, created_at DESC)"
+            )
+
+    def _connect(self):
+        return self._psycopg.connect(self.dsn, row_factory=self._row_factory)
+
+
 def build_campaign_store(settings: StoreSettings | None = None) -> CampaignStore:
     resolved = settings or StoreSettings.from_env()
     if resolved.backend == "memory":
         return InMemoryCampaignStore()
     if resolved.backend == "sqlite":
         return SQLiteCampaignStore(resolved.sqlite_path)
+    if resolved.backend == "postgres":
+        return PostgreSQLCampaignStore(resolved.postgres_dsn)
 
     raise ValueError(
-        f"Unknown campaign store backend '{resolved.backend}'. Supported backends: memory, sqlite"
+        f"Unknown campaign store backend '{resolved.backend}'. Supported backends: memory, sqlite, postgres"
     )
 
 
@@ -384,6 +717,7 @@ def _stored_campaign_from_payload(payload: dict[str, Any]) -> StoredCampaign:
 
     return StoredCampaign(
         campaign_id=payload["id"],
+        organization_id=_normalize_organization_id(payload.get("organization_id", "default")),
         created_at=payload["created_at"],
         updated_at=payload["updated_at"],
         status=payload["status"],
@@ -398,6 +732,17 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _normalize_organization_id(value: str | None) -> str:
+    normalized = (value or "default").strip()
+    return normalized or "default"
+
+
+def _matches_organization(stored: StoredCampaign, organization_id: str | None) -> bool:
+    if organization_id is None:
+        return True
+    return stored.organization_id == _normalize_organization_id(organization_id)
+
+
 def _generated_asset_from_payload(payload: dict[str, Any] | None) -> GeneratedAsset | None:
     if not payload:
         return None
@@ -409,3 +754,9 @@ def _generated_asset_from_payload(payload: dict[str, Any] | None) -> GeneratedAs
         prompt=payload["prompt"],
         revised_prompt=payload.get("revised_prompt"),
     )
+
+
+def _coerce_json_payload(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    return json.loads(value)

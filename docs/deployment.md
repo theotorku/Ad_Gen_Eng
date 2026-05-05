@@ -42,6 +42,12 @@ Required environment variable:
 VITE_API_BASE_URL
 ```
 
+Optional workspace selector:
+
+```text
+VITE_ORGANIZATION_ID
+```
+
 The frontend should be deployed as a static site and pointed at the backend URL for the same environment.
 
 ### Backend
@@ -52,7 +58,7 @@ The current local server entrypoint is:
 python main.py serve
 ```
 
-That is acceptable for internal or demo hosting, but for production the backend should be wrapped in a proper container image and started through a process manager or managed platform runtime.
+That starts the FastAPI app through Uvicorn. For production, wrap the backend in a proper container image or use the platform's Python web-service runtime.
 
 Minimum runtime needs:
 
@@ -87,6 +93,7 @@ Common backend settings:
 
 - `AD_ENGINE_DB_BACKEND`
 - `AD_ENGINE_SQLITE_PATH`
+- `AD_ENGINE_POSTGRES_DSN`
 - `AD_ENGINE_PLANNING_PROVIDER`
 - `AD_ENGINE_COPY_PROVIDER`
 - `AD_ENGINE_IMAGE_PROVIDER`
@@ -103,14 +110,15 @@ Suggested environment defaults:
 - local: `AD_ENGINE_DB_BACKEND=sqlite`
 - local without image costs: `AD_ENGINE_IMAGE_PROVIDER=prompt_template`
 - local with generated images: `AD_ENGINE_IMAGE_PROVIDER=openai_images` and `OPENAI_IMAGE_MODEL=gpt-image-2`
-- staging: move to a managed database before shared testing
-- production: avoid SQLite and local asset-only storage
+- staging: `AD_ENGINE_DB_BACKEND=postgres` with a managed database
+- production: `AD_ENGINE_DB_BACKEND=postgres`; avoid SQLite and local asset-only storage
 
 ### Frontend Variables
 
 The main frontend variable is:
 
 - `VITE_API_BASE_URL`
+- `VITE_ORGANIZATION_ID`
 
 Examples:
 
@@ -146,7 +154,14 @@ Why:
 - easier horizontal scaling
 - better operational visibility
 
-The current store abstraction is a good seam for introducing a Postgres-backed implementation.
+The store abstraction includes a Postgres backend selected with:
+
+```text
+AD_ENGINE_DB_BACKEND=postgres
+AD_ENGINE_POSTGRES_DSN=postgresql://...
+```
+
+Install the `psycopg[binary]` dependency in the backend runtime.
 
 ## Asset Strategy
 
@@ -254,6 +269,7 @@ Add:
 - authentication and authorization
 - backup and restore procedures
 - asset retention policy
+- background jobs for slow image generation requests
 
 ## Platform Recommendation
 
