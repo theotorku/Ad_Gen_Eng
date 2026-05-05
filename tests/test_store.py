@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ad_engine.engine import AdGenerationEngine
+from ad_engine.models import GeneratedAsset
 from ad_engine.providers import build_provider_stack
 from ad_engine.store import (
     InMemoryCampaignStore,
@@ -105,6 +106,48 @@ def test_update_variant_edits_copy(bundle):
     assert variant.cta == "Start now"
     assert variant.image_prompt == "Edited image prompt"
     assert updated.updated_at != stored.created_at
+
+
+def test_update_variant_image_records_generated_asset(bundle):
+    store = InMemoryCampaignStore()
+    stored = store.create(bundle)
+    asset = GeneratedAsset(
+        path="/generated-assets/test.png",
+        mime_type="image/png",
+        provider="openai_images",
+        prompt="Prompt",
+    )
+
+    updated = store.update_variant_image(
+        stored.campaign_id,
+        0,
+        image_status="generated",
+        generated_asset=asset,
+    )
+
+    assert updated is not None
+    variant = updated.bundle.variants[0]
+    assert variant.image_status == "generated"
+    assert variant.generated_asset == asset
+    assert variant.image_error is None
+
+
+def test_update_variant_image_records_failure(bundle):
+    store = InMemoryCampaignStore()
+    stored = store.create(bundle)
+
+    updated = store.update_variant_image(
+        stored.campaign_id,
+        0,
+        image_status="failed",
+        image_error="Provider timed out.",
+    )
+
+    assert updated is not None
+    variant = updated.bundle.variants[0]
+    assert variant.image_status == "failed"
+    assert variant.generated_asset is None
+    assert variant.image_error == "Provider timed out."
 
 
 def test_update_variant_rejects_out_of_range_index(bundle):

@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from ad_engine.engine import AdGenerationEngine
 from ad_engine.fastapi_app import create_app
+from ad_engine.models import GeneratedAsset
 from ad_engine.providers import build_provider_stack
 from ad_engine.store import InMemoryCampaignStore
 
@@ -88,6 +89,48 @@ def test_fastapi_exports_campaign_text(brief_payload):
     assert response.status_code == 200
     assert "Campaign: Northstar AI" in response.text
     assert "Variants" in response.text
+
+
+def test_fastapi_generates_one_variant_image(monkeypatch, brief_payload):
+    class FakeOpenAIImagesProvider:
+        def generate_variant_image(self, brief, variant, *, index=1):
+            return GeneratedAsset(
+                path="/generated-assets/fake.png",
+                mime_type="image/png",
+                provider="openai_images",
+                prompt=variant.image_prompt,
+            )
+
+    monkeypatch.setattr("ad_engine.fastapi_app.OpenAIImagesProvider", FakeOpenAIImagesProvider)
+    client = _client()
+    created = client.post("/bundles", json=brief_payload)
+    campaign_id = created.json()["id"]
+
+    response = client.post(f"/campaigns/{campaign_id}/variants/0/generate-image")
+
+    assert response.status_code == 200
+    variant = response.json()["bundle"]["variants"][0]
+    assert variant["image_status"] == "generated"
+    assert variant["generated_asset"]["path"] == "/generated-assets/fake.png"
+
+
+def test_fastapi_records_variant_image_failure(monkeypatch, brief_payload):
+    class FakeOpenAIImagesProvider:
+        def generate_variant_image(self, brief, variant, *, index=1):
+            raise ValueError("Provider timed out.")
+
+    monkeypatch.setattr("ad_engine.fastapi_app.OpenAIImagesProvider", FakeOpenAIImagesProvider)
+    client = _client()
+    created = client.post("/bundles", json=brief_payload)
+    campaign_id = created.json()["id"]
+
+    response = client.post(f"/campaigns/{campaign_id}/variants/0/generate-image")
+
+    assert response.status_code == 200
+    variant = response.json()["bundle"]["variants"][0]
+    assert variant["image_status"] == "failed"
+    assert variant["generated_asset"] is None
+    assert variant["image_error"] == "Provider timed out."
 
 
 def test_fastapi_required_auth_maps_key_to_workspace(monkeypatch, brief_payload):

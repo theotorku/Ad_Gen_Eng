@@ -6,6 +6,7 @@ import {
   exportCampaignText,
   fetchCampaign,
   fetchCampaigns,
+  generateVariantImage,
   updateCampaign,
   updateCampaignVariant,
 } from "./api";
@@ -37,11 +38,19 @@ function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingVariantIndex, setSavingVariantIndex] = useState<number | null>(null);
+  const [generatingImageIndex, setGeneratingImageIndex] = useState<number | null>(null);
   const [isApproving, setIsApproving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [isPending, startTransition] = useTransition();
-  const isWorking = isPending || isCreating || isSaving || isApproving || savingVariantIndex !== null || isExporting;
+  const isWorking =
+    isPending ||
+    isCreating ||
+    isSaving ||
+    isApproving ||
+    savingVariantIndex !== null ||
+    generatingImageIndex !== null ||
+    isExporting;
   const isDarkMode = theme === "dark";
 
   const selectedCampaign = useMemo(
@@ -172,6 +181,25 @@ function App() {
     }
   }
 
+  async function handleGenerateVariantImage(variantIndex: number) {
+    if (!selectedCampaign || generatingImageIndex !== null) return;
+    setGeneratingImageIndex(variantIndex);
+    try {
+      setErrorMessage(null);
+      setStatusMessage("Generating variant image");
+      const updated = await generateVariantImage(selectedCampaign.id, variantIndex);
+      replaceCampaign(updated);
+      const imageStatus = updated.bundle.variants[variantIndex]?.image_status;
+      setStatusMessage(imageStatus === "failed" ? "Image generation failed" : "Variant image generated");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to generate image.";
+      setErrorMessage(message);
+      setStatusMessage("Image generation failed");
+    } finally {
+      setGeneratingImageIndex(null);
+    }
+  }
+
   async function handleExportCampaign() {
     if (!selectedCampaign || isExporting) return;
     setIsExporting(true);
@@ -287,11 +315,13 @@ function App() {
             approvalNotes={approvalNotes}
             isSaving={isSaving}
             savingVariantIndex={savingVariantIndex}
+            generatingImageIndex={generatingImageIndex}
             isApproving={isApproving}
             isExporting={isExporting}
             onApprovalNotesChange={setApprovalNotes}
             onSaveNotes={handleSaveNotes}
             onSaveVariant={handleSaveVariant}
+            onGenerateVariantImage={handleGenerateVariantImage}
             onApprove={handleApproveCampaign}
             onExport={handleExportCampaign}
           />

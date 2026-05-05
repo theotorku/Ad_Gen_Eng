@@ -82,37 +82,64 @@ class OpenAIImagesProvider(ImageProvider):
             "OPENAI_IMAGE_OUTPUT_FORMAT", "png").strip() or "png"
         self.timeout_seconds = int(
             os.getenv("OPENAI_IMAGE_TIMEOUT_SECONDS", "180").strip() or "180")
+        self.generate_during_create = _env_flag(
+            "OPENAI_IMAGE_GENERATE_DURING_CREATE")
         self.output_dir = get_generated_asset_root()
 
     def attach_image_prompts(self, brief: CampaignBrief, variants: list[AdVariant]) -> None:
+        attach_image_prompts(brief, variants)
+        if not self.generate_during_create:
+            return
+
         if not self.api_key:
             raise ValueError(
                 "OPENAI_API_KEY is required when AD_ENGINE_IMAGE_PROVIDER=openai_images."
             )
 
-        attach_image_prompts(brief, variants)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         for index, variant in enumerate(variants, start=1):
-            response_payload = self._generate_image(variant.image_prompt)
-            image_record = response_payload["data"][0]
-            image_base64 = image_record.get("b64_json")
-            if not image_base64:
-                raise ValueError(
-                    "OpenAI Images API did not return base64 image data.")
+            self.generate_variant_image(brief, variant, index=index)
 
-            filename = self._build_filename(brief, variant, index)
-            file_path = self.output_dir / filename
-            file_bytes = base64.b64decode(image_base64)
-            file_path.write_bytes(file_bytes)
-
-            variant.generated_asset = GeneratedAsset(
-                path=f"/generated-assets/{filename}",
-                mime_type=_mime_type_for_format(self.output_format),
-                provider=self.provider_name,
-                prompt=variant.image_prompt,
-                revised_prompt=image_record.get("revised_prompt"),
+    def generate_variant_image(
+        self,
+        brief: CampaignBrief,
+        variant: AdVariant,
+        *,
+        index: int = 1,
+    ) -> GeneratedAsset:
+        if not self.api_key:
+            raise ValueError(
+                "OPENAI_API_KEY is required when generating images with openai_images."
             )
+
+        if not variant.image_prompt:
+            attach_image_prompts(brief, [variant])
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        response_payload = self._generate_image(variant.image_prompt)
+        image_record = response_payload["data"][0]
+        image_base64 = image_record.get("b64_json")
+        if not image_base64:
+            raise ValueError(
+                "OpenAI Images API did not return base64 image data.")
+
+        filename = self._build_filename(brief, variant, index)
+        file_path = self.output_dir / filename
+        file_bytes = base64.b64decode(image_base64)
+        file_path.write_bytes(file_bytes)
+
+        generated_asset = GeneratedAsset(
+            path=f"/generated-assets/{filename}",
+            mime_type=_mime_type_for_format(self.output_format),
+            provider=self.provider_name,
+            prompt=variant.image_prompt,
+            revised_prompt=image_record.get("revised_prompt"),
+        )
+        variant.generated_asset = generated_asset
+        variant.image_status = "generated"
+        variant.image_error = None
+        return generated_asset
 
     def _generate_image(self, prompt: str) -> dict:
         payload = {
@@ -188,3 +215,7 @@ def _slugify(value: str) -> str:
                       else "-" for char in value)
     collapsed = "-".join(part for part in cleaned.split("-") if part)
     return collapsed or "asset"
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}

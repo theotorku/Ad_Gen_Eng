@@ -10,11 +10,13 @@ function renderDetail(overrides: Partial<Parameters<typeof CampaignDetail>[0]> =
     approvalNotes: "",
     isSaving: false,
     savingVariantIndex: null,
+    generatingImageIndex: null,
     isApproving: false,
     isExporting: false,
     onApprovalNotesChange: vi.fn(),
     onSaveNotes: vi.fn(),
     onSaveVariant: vi.fn(),
+    onGenerateVariantImage: vi.fn(),
     onApprove: vi.fn(),
     onExport: vi.fn(),
     ...overrides,
@@ -31,11 +33,13 @@ describe("CampaignDetail", () => {
         approvalNotes=""
         isSaving={false}
         savingVariantIndex={null}
+        generatingImageIndex={null}
         isApproving={false}
         isExporting={false}
         onApprovalNotesChange={vi.fn()}
         onSaveNotes={vi.fn()}
         onSaveVariant={vi.fn()}
+        onGenerateVariantImage={vi.fn()}
         onApprove={vi.fn()}
         onExport={vi.fn()}
       />,
@@ -74,6 +78,18 @@ describe("CampaignDetail", () => {
     await userEvent.click(screen.getByRole("button", { name: /export/i }));
 
     expect(props.onExport).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes image generation requests from variant cards", async () => {
+    const props = renderDetail();
+    const [generateImageButton] = screen.getAllByRole("button", { name: /generate image/i });
+    if (!generateImageButton) {
+      throw new Error("Expected at least one generate image button.");
+    }
+
+    await userEvent.click(generateImageButton);
+
+    expect(props.onGenerateVariantImage).toHaveBeenCalledWith(0);
   });
 
   it("calls onApprovalNotesChange when the textarea is edited", async () => {

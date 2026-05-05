@@ -106,12 +106,14 @@ Common backend settings:
 - `OPENAI_IMAGE_BACKGROUND`
 - `OPENAI_IMAGE_OUTPUT_FORMAT`
 - `OPENAI_IMAGE_OUTPUT_DIR`
+- `OPENAI_IMAGE_GENERATE_DURING_CREATE`
 
 Suggested environment defaults:
 
 - local: `AD_ENGINE_DB_BACKEND=sqlite`
 - local without image costs: `AD_ENGINE_IMAGE_PROVIDER=prompt_template`
 - local with generated images: `AD_ENGINE_IMAGE_PROVIDER=openai_images` and `OPENAI_IMAGE_MODEL=gpt-image-2`
+- SaaS-safe image flow: keep `OPENAI_IMAGE_GENERATE_DURING_CREATE=false` and generate selected images per variant
 - staging: `AD_ENGINE_DB_BACKEND=postgres` with a managed database
 - production: `AD_ENGINE_DB_BACKEND=postgres`; avoid SQLite and local asset-only storage
 - staging/prod auth: `AD_ENGINE_REQUIRE_API_KEY=true` and `AD_ENGINE_API_KEYS=key:organization_id`
@@ -170,6 +172,11 @@ Install the `psycopg[binary]` dependency in the backend runtime.
 ## Asset Strategy
 
 When `openai_images` is enabled, generated assets are currently written to local disk.
+
+Campaign creation should stay prompt-only in shared environments. Generate selected
+variant images through the per-variant endpoint/UI so one campaign does not block
+on many image requests or spend on every draft variant. `OPENAI_IMAGE_GENERATE_DURING_CREATE=true`
+is available for demos, but should stay off for SaaS usage.
 
 That is fine for local development. It is not a strong production strategy because:
 

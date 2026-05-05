@@ -21,6 +21,8 @@ export const sampleVariant: AdVariant = {
   cta: "Book a demo",
   image_prompt: "Studio-lit dashboard with a single accent gradient",
   generated_asset: null,
+  image_status: "prompt_only",
+  image_error: null,
   review_notes: [],
 };
 

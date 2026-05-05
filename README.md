@@ -91,6 +91,7 @@ npm run dev -- --host 127.0.0.1 --port 4174
 - `GET /campaigns/{id}`: fetch campaign details, status, and bundle
 - `PATCH /campaigns/{id}`: update campaign status, notes, or metadata
 - `PATCH /campaigns/{id}/variants/{index}`: edit generated variant copy and prompt text
+- `POST /campaigns/{id}/variants/{index}/generate-image`: generate or retry one variant image
 - `POST /campaigns/{id}/approve`: mark a campaign approved
 - `GET /campaigns/{id}/export.txt`: export a campaign as plain text
 
@@ -152,6 +153,12 @@ These defaults preserve the current local behavior while moving the engine onto 
 - `OPENAI_IMAGE_BACKGROUND=auto`
 - `OPENAI_IMAGE_OUTPUT_FORMAT=png`
 - `OPENAI_IMAGE_OUTPUT_DIR=./data/generated_assets`
+- `OPENAI_IMAGE_GENERATE_DURING_CREATE=false`
+
+Campaign creation stays prompt-only by default, even when `AD_ENGINE_IMAGE_PROVIDER=openai_images`.
+Use the dashboard's per-variant image button, or call `POST /campaigns/{id}/variants/{index}/generate-image`,
+to generate selected images. Set `OPENAI_IMAGE_GENERATE_DURING_CREATE=true` only when you intentionally want
+campaign creation to block on every variant image.
 
 Example:
 

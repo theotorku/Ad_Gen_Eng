@@ -99,6 +99,7 @@ You can:
 - read the strategy summary
 - inspect generated ad variants
 - edit headlines, primary text, CTAs, and image prompts
+- generate or retry one image at a time
 - export the campaign as a text bundle
 - review the image prompts
 - add approval notes
@@ -119,7 +120,7 @@ The app will create:
 - channel-specific ad variants
 - image prompts for each variant
 
-If the OpenAI image integration is turned on, the campaign can also include real generated images in the review view.
+Campaign creation stays fast and creates image prompts first. If GPT Image 2 is configured, generate real images from the campaign detail view one variant at a time.
 
 ## Turning On GPT Image 2
 
@@ -134,9 +135,10 @@ OPENAI_IMAGE_QUALITY=medium
 OPENAI_IMAGE_BACKGROUND=auto
 OPENAI_IMAGE_OUTPUT_FORMAT=png
 OPENAI_IMAGE_OUTPUT_DIR=./data/generated_assets
+OPENAI_IMAGE_GENERATE_DURING_CREATE=false
 ```
 
-Restart the backend after changing these settings. New campaigns will save generated image files under `data/generated_assets` and show them in the campaign detail view.
+Restart the backend after changing these settings. New campaigns will still create prompts first. Open a campaign and select `Generate image` on a variant to save a generated file under `data/generated_assets` and show it in the review view.
 
 ## How To Review a Campaign
 
@@ -159,6 +161,15 @@ If a variant is close but needs final polish, use `Edit` on that variant. If the
 4. Select `Save`.
 
 The campaign keeps the edited variant and updates the campaign timestamp.
+
+## How To Generate Images
+
+1. Open a campaign.
+2. Review or edit the variant's image prompt.
+3. Select `Generate image` on that variant.
+4. If generation fails, review the message and select `Retry image`.
+
+Generate images only for variants you actually plan to use. This keeps cost and wait time under control.
 
 ## How To Export a Campaign
 
@@ -240,5 +251,5 @@ This is still an MVP. Right now:
 - campaigns are generated from structured briefs only
 - direct in-app editing currently covers generated variant copy and image prompts
 - export is plain text only
-- image asset creation requires `AD_ENGINE_IMAGE_PROVIDER=openai_images` and a valid `OPENAI_API_KEY`
+- image asset creation is per variant and requires `AD_ENGINE_IMAGE_PROVIDER=openai_images` plus a valid `OPENAI_API_KEY`
 - approval is simple and does not include multi-person workflow

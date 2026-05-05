@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict
 
 from .api import DEFAULT_CORS_ORIGINS, DEFAULT_ORGANIZATION_ID
-from .assets import get_generated_asset_root
+from .assets import OpenAIImagesProvider, get_generated_asset_root
 from .auth import AuthContext, AuthSettings, AuthenticationError, resolve_auth_context
 from .engine import AdGenerationEngine
 from .providers import build_provider_stack
@@ -216,6 +216,65 @@ def create_app(
                 detail=f"Campaign '{campaign_id}' was not found.",
             )
         return stored.to_dict()
+
+    @app.post("/campaigns/{campaign_id}/variants/{variant_index}/generate-image")
+    def generate_variant_image(
+        campaign_id: str,
+        variant_index: int,
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
+        stored = app.state.store.get(
+            campaign_id, organization_id=auth.organization_id
+        )
+        if stored is None:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' was not found.",
+            )
+        if variant_index < 0 or variant_index >= len(stored.bundle.variants):
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Variant index is out of range.",
+            )
+
+        app.state.store.update_variant_image(
+            campaign_id,
+            variant_index,
+            organization_id=auth.organization_id,
+            image_status="generating",
+        )
+
+        variant = stored.bundle.variants[variant_index]
+        try:
+            asset = OpenAIImagesProvider().generate_variant_image(
+                stored.bundle.brief,
+                variant,
+                index=variant_index + 1,
+            )
+            updated = app.state.store.update_variant_image(
+                campaign_id,
+                variant_index,
+                organization_id=auth.organization_id,
+                image_status="generated",
+                generated_asset=asset,
+            )
+        except ValueError as exc:
+            updated = app.state.store.update_variant_image(
+                campaign_id,
+                variant_index,
+                organization_id=auth.organization_id,
+                image_status="failed",
+                image_error=str(exc),
+            )
+
+        if updated is None:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' was not found.",
+            )
+        return updated.to_dict()
 
     @app.get("/campaigns/{campaign_id}/export.txt")
     def export_campaign_text(

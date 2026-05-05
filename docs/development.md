@@ -91,7 +91,7 @@ $env:OPENAI_IMAGE_OUTPUT_DIR = '.\data\generated_assets'
 python main.py serve
 ```
 
-With `openai_images` active, every generated variant makes an OpenAI Images API request. Use `prompt_template` when you only want local, no-cost prompt generation.
+By default, `openai_images` attaches prompts during campaign creation and generates real images only through the per-variant endpoint/UI. Use `prompt_template` when you only want local, no-cost prompt generation. Set `OPENAI_IMAGE_GENERATE_DURING_CREATE=true` only when intentionally testing bulk image generation during campaign creation.
 
 ## Testing Strategy
 

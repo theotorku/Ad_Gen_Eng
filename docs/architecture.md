@@ -52,7 +52,7 @@ Registered image provider options currently include:
 - `prompt_template`
 - `openai_images`
 
-When `openai_images` is active, the provider calls the OpenAI Images API with `gpt-image-2` by default, saves generated image files locally, and attaches a generated asset reference to each ad variant. Those files are then served by the API through `/generated-assets/...`.
+When `openai_images` is active, campaign creation still attaches image prompts by default. Real images are generated per variant through the API/dashboard using GPT Image 2, then saved locally with a generated asset reference on the variant. Those files are served by the API through `/generated-assets/...`. Bulk image generation during campaign creation is available only when `OPENAI_IMAGE_GENERATE_DURING_CREATE=true`.
 
 Provider selection is controlled with environment variables:
 
@@ -69,6 +69,7 @@ OpenAI image generation is configured with:
 - `OPENAI_IMAGE_BACKGROUND`
 - `OPENAI_IMAGE_OUTPUT_FORMAT`
 - `OPENAI_IMAGE_OUTPUT_DIR`
+- `OPENAI_IMAGE_GENERATE_DURING_CREATE`
 
 New providers should implement the relevant protocol in [providers.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/providers.py>) and then be registered in `build_provider_stack()`.
 

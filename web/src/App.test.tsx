@@ -11,6 +11,7 @@ vi.mock("./api", () => ({
   exportCampaignText: vi.fn(),
   fetchCampaign: vi.fn(),
   fetchCampaigns: vi.fn(),
+  generateVariantImage: vi.fn(),
   updateCampaign: vi.fn(),
   updateCampaignVariant: vi.fn(),
 }));

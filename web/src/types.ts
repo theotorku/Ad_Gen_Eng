@@ -27,6 +27,8 @@ export type AdVariant = {
   cta: string;
   image_prompt: string;
   generated_asset?: GeneratedAsset | null;
+  image_status?: "prompt_only" | "generating" | "generated" | "failed";
+  image_error?: string | null;
   review_notes: string[];
 };
 

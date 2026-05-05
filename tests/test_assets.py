@@ -4,6 +4,7 @@ import json
 from unittest.mock import patch
 
 from ad_engine.assets import OpenAIImagesProvider
+from ad_engine.models import AdVariant
 
 
 class _FakeResponse:
@@ -43,3 +44,25 @@ def test_openai_images_provider_sends_gpt_image_payload(monkeypatch):
         "background": "auto",
         "output_format": "png",
     }
+
+
+def test_openai_images_provider_does_not_generate_during_create_by_default(monkeypatch, valid_brief):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.delenv("OPENAI_IMAGE_GENERATE_DURING_CREATE", raising=False)
+    provider = OpenAIImagesProvider()
+    variant = AdVariant(
+        channel="linkedin",
+        angle="Speed up launch planning.",
+        headline="Launch faster",
+        primary_text="Move from brief to campaign faster.",
+        cta="Book a demo",
+        image_prompt="",
+    )
+
+    with patch("ad_engine.assets.request.urlopen") as urlopen:
+        provider.attach_image_prompts(valid_brief, [variant])
+
+    urlopen.assert_not_called()
+    assert variant.image_prompt
+    assert variant.generated_asset is None
+    assert variant.image_status == "prompt_only"

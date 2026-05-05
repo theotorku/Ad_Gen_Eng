@@ -109,6 +109,18 @@ class CampaignStore(Protocol):
     ) -> StoredCampaign | None:
         ...
 
+    def update_variant_image(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        image_status: str,
+        generated_asset: GeneratedAsset | None = None,
+        image_error: str | None = None,
+    ) -> StoredCampaign | None:
+        ...
+
 
 class InMemoryCampaignStore:
     backend_name = "memory"
@@ -207,6 +219,30 @@ class InMemoryCampaignStore:
                 primary_text=primary_text,
                 cta=cta,
                 image_prompt=image_prompt,
+            )
+            return stored
+
+    def update_variant_image(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        image_status: str,
+        generated_asset: GeneratedAsset | None = None,
+        image_error: str | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock:
+            stored = self._items.get(campaign_id)
+            if stored is None or not _matches_organization(stored, organization_id):
+                return None
+
+            _apply_variant_image_updates(
+                stored,
+                variant_index,
+                image_status=image_status,
+                generated_asset=generated_asset,
+                image_error=image_error,
             )
             return stored
 
@@ -463,6 +499,32 @@ class SQLiteCampaignStore:
 
         return stored
 
+    def update_variant_image(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        image_status: str,
+        generated_asset: GeneratedAsset | None = None,
+        image_error: str | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock, closing(self._connect()) as connection, connection:
+            stored = self._load_for_update(connection, campaign_id, organization_id)
+            if stored is None:
+                return None
+
+            _apply_variant_image_updates(
+                stored,
+                variant_index,
+                image_status=image_status,
+                generated_asset=generated_asset,
+                image_error=image_error,
+            )
+            self._persist_payload(connection, stored)
+
+        return stored
+
     def _initialize_schema(self) -> None:
         with self._lock, closing(self._connect()) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
@@ -509,6 +571,50 @@ class SQLiteCampaignStore:
         connection.execute("PRAGMA synchronous=NORMAL")
         connection.execute("PRAGMA foreign_keys=ON")
         return connection
+
+    def _load_for_update(
+        self,
+        connection: sqlite3.Connection,
+        campaign_id: str,
+        organization_id: str | None,
+    ) -> StoredCampaign | None:
+        if organization_id is None:
+            row = connection.execute(
+                """
+                SELECT payload_json
+                FROM campaigns
+                WHERE id = ?
+                """,
+                (campaign_id,),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                """
+                SELECT payload_json
+                FROM campaigns
+                WHERE id = ? AND organization_id = ?
+                """,
+                (campaign_id, _normalize_organization_id(organization_id)),
+            ).fetchone()
+
+        if row is None:
+            return None
+        return _stored_campaign_from_payload(json.loads(row["payload_json"]))
+
+    def _persist_payload(self, connection: sqlite3.Connection, stored: StoredCampaign) -> None:
+        connection.execute(
+            """
+            UPDATE campaigns
+            SET updated_at = ?,
+                payload_json = ?
+            WHERE id = ?
+            """,
+            (
+                stored.updated_at,
+                json.dumps(stored.to_dict()),
+                stored.campaign_id,
+            ),
+        )
 
 
 class PostgreSQLCampaignStore:
@@ -760,6 +866,32 @@ class PostgreSQLCampaignStore:
 
         return stored
 
+    def update_variant_image(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        image_status: str,
+        generated_asset: GeneratedAsset | None = None,
+        image_error: str | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock, self._connect() as connection:
+            stored = self._load_for_update(connection, campaign_id, organization_id)
+            if stored is None:
+                return None
+
+            _apply_variant_image_updates(
+                stored,
+                variant_index,
+                image_status=image_status,
+                generated_asset=generated_asset,
+                image_error=image_error,
+            )
+            self._persist_payload(connection, stored)
+
+        return stored
+
     def _initialize_schema(self) -> None:
         with self._lock, self._connect() as connection:
             connection.execute(
@@ -792,6 +924,46 @@ class PostgreSQLCampaignStore:
 
     def _connect(self):
         return self._psycopg.connect(self.dsn, row_factory=self._row_factory)
+
+    def _load_for_update(
+        self,
+        connection,
+        campaign_id: str,
+        organization_id: str | None,
+    ) -> StoredCampaign | None:
+        if organization_id is None:
+            row = connection.execute(
+                "SELECT payload_json FROM campaigns WHERE id = %s",
+                (campaign_id,),
+            ).fetchone()
+        else:
+            row = connection.execute(
+                """
+                SELECT payload_json
+                FROM campaigns
+                WHERE id = %s AND organization_id = %s
+                """,
+                (campaign_id, _normalize_organization_id(organization_id)),
+            ).fetchone()
+
+        if row is None:
+            return None
+        return _stored_campaign_from_payload(_coerce_json_payload(row["payload_json"]))
+
+    def _persist_payload(self, connection, stored: StoredCampaign) -> None:
+        connection.execute(
+            """
+            UPDATE campaigns
+            SET updated_at = %s,
+                payload_json = %s
+            WHERE id = %s
+            """,
+            (
+                stored.updated_at,
+                json.dumps(stored.to_dict()),
+                stored.campaign_id,
+            ),
+        )
 
 
 def build_campaign_store(settings: StoreSettings | None = None) -> CampaignStore:
@@ -860,6 +1032,26 @@ def _apply_variant_updates(
     stored.updated_at = _utc_now()
 
 
+def _apply_variant_image_updates(
+    stored: StoredCampaign,
+    variant_index: int,
+    *,
+    image_status: str,
+    generated_asset: GeneratedAsset | None,
+    image_error: str | None,
+) -> None:
+    if variant_index < 0 or variant_index >= len(stored.bundle.variants):
+        raise ValueError("Variant index is out of range.")
+    if image_status not in {"prompt_only", "generating", "generated", "failed"}:
+        raise ValueError("Unsupported image status.")
+
+    variant = stored.bundle.variants[variant_index]
+    variant.image_status = image_status
+    variant.generated_asset = generated_asset
+    variant.image_error = image_error.strip() if image_error else None
+    stored.updated_at = _utc_now()
+
+
 def _stored_campaign_from_payload(payload: dict[str, Any]) -> StoredCampaign:
     bundle_payload = payload["bundle"]
     brief_payload = bundle_payload["brief"]
@@ -885,6 +1077,8 @@ def _stored_campaign_from_payload(payload: dict[str, Any]) -> StoredCampaign:
                 image_prompt=variant["image_prompt"],
                 generated_asset=_generated_asset_from_payload(
                     variant.get("generated_asset")),
+                image_status=variant.get("image_status", "generated" if variant.get("generated_asset") else "prompt_only"),
+                image_error=variant.get("image_error"),
                 review_notes=list(variant.get("review_notes", [])),
             )
             for variant in bundle_payload["variants"]

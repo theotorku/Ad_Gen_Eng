@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Edit3, Save } from "lucide-react";
+import { Edit3, ImageIcon, RefreshCw, Save } from "lucide-react";
 import type { AdVariant } from "../types";
 import { apiBaseUrl, formatChannel } from "../utils";
 
@@ -7,13 +7,22 @@ type VariantCardProps = {
   variant: AdVariant;
   index?: number;
   isSaving?: boolean;
+  isGeneratingImage?: boolean;
   onSave?: (
     index: number,
     payload: Pick<AdVariant, "headline" | "primary_text" | "cta" | "image_prompt">,
   ) => void;
+  onGenerateImage?: (index: number) => void;
 };
 
-function VariantCard({ variant, index = 0, isSaving = false, onSave }: VariantCardProps) {
+function VariantCard({
+  variant,
+  index = 0,
+  isSaving = false,
+  isGeneratingImage = false,
+  onSave,
+  onGenerateImage,
+}: VariantCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState({
     headline: variant.headline,
@@ -37,6 +46,10 @@ function VariantCard({ variant, index = 0, isSaving = false, onSave }: VariantCa
     setIsEditing(false);
   }
 
+  const imageStatus = isGeneratingImage ? "generating" : variant.image_status ?? (variant.generated_asset ? "generated" : "prompt_only");
+  const imageButtonLabel =
+    imageStatus === "failed" ? "Retry image" : variant.generated_asset ? "Regenerate image" : "Generate image";
+
   return (
     <article className="variant-item">
       <div className="variant-head">
@@ -44,6 +57,15 @@ function VariantCard({ variant, index = 0, isSaving = false, onSave }: VariantCa
         <span>{variant.cta}</span>
       </div>
       <div className="variant-actions">
+        <button
+          className="ghost-action"
+          type="button"
+          onClick={() => onGenerateImage?.(index)}
+          disabled={!onGenerateImage || isGeneratingImage}
+        >
+          {imageStatus === "failed" ? <RefreshCw size={13} /> : <ImageIcon size={13} />}
+          {isGeneratingImage ? "Generating" : imageButtonLabel}
+        </button>
         {isEditing ? (
           <button className="ghost-action" type="button" onClick={handleSave} disabled={isSaving}>
             <Save size={13} />
@@ -103,6 +125,10 @@ function VariantCard({ variant, index = 0, isSaving = false, onSave }: VariantCa
               alt={variant.headline}
             />
           ) : null}
+          <div className={`image-status ${imageStatus}`}>
+            <span>{imageStatus.replace("_", " ")}</span>
+            {variant.image_error ? <p>{variant.image_error}</p> : null}
+          </div>
           <p>{variant.primary_text}</p>
           <div className="prompt-block">
             <span>Image prompt</span>

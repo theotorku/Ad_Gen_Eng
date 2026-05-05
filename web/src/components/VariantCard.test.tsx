@@ -59,4 +59,29 @@ describe("VariantCard", () => {
       expect.objectContaining({ headline: "New headline" }),
     );
   });
+
+  it("requests image generation for a variant", async () => {
+    const onGenerateImage = vi.fn();
+    render(<VariantCard variant={sampleVariant} index={3} onGenerateImage={onGenerateImage} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /generate image/i }));
+
+    expect(onGenerateImage).toHaveBeenCalledWith(3);
+  });
+
+  it("shows retry state when image generation failed", () => {
+    render(
+      <VariantCard
+        variant={{
+          ...sampleVariant,
+          image_status: "failed",
+          image_error: "Provider timed out.",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("failed")).toBeInTheDocument();
+    expect(screen.getByText("Provider timed out.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry image/i })).toBeInTheDocument();
+  });
 });

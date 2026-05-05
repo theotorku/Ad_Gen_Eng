@@ -136,6 +136,22 @@ Example:
 Invoke-RestMethod -Method Patch -Uri http://127.0.0.1:8000/campaigns/<campaign-id>/variants/0 -ContentType 'application/json' -Body '{"headline":"Updated launch headline","primary_text":"Updated campaign body copy."}'
 ```
 
+### `POST /campaigns/{id}/variants/{index}/generate-image`
+
+Generates or retries a GPT Image 2 asset for one variant. The index is zero-based.
+
+The response is the updated campaign record. The selected variant will include:
+
+- `image_status`: `generated` or `failed`
+- `generated_asset`: the generated file reference when successful
+- `image_error`: the provider error when generation fails
+
+Example:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/campaigns/<campaign-id>/variants/0/generate-image
+```
+
 ### `GET /campaigns/{id}/export.txt`
 
 Returns a plain-text campaign export containing the brief summary, strategy,
@@ -162,6 +178,7 @@ The API returns `400 Bad Request` when:
 - an unsupported campaign status is supplied
 - a variant edit targets an out-of-range index
 - a variant edit field is empty
+- an image generation request targets an out-of-range index
 
 The API returns `404 Not Found` when a campaign ID or route does not exist.
 
@@ -172,5 +189,6 @@ The API returns `404 Not Found` when a campaign ID or route does not exist.
 - Send `X-Organization-ID: <workspace-id>` to isolate campaign reads and writes by workspace.
 - Send `X-API-Key: <key>` when `AD_ENGINE_REQUIRE_API_KEY=true`.
 - `POST /bundles` is currently the campaign creation endpoint.
+- Campaign creation attaches prompts by default. Generate real images per variant with `POST /campaigns/{id}/variants/{index}/generate-image`.
 - `GET /bundles/{id}` and `GET /campaigns/{id}` use the same underlying campaign ID.
 - Generated image files are saved on disk and exposed through `GET /generated-assets/{filename}` when `AD_ENGINE_IMAGE_PROVIDER=openai_images` is active.

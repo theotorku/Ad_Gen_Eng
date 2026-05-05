@@ -8,6 +8,7 @@ type CampaignDetailProps = {
   approvalNotes: string;
   isSaving: boolean;
   savingVariantIndex: number | null;
+  generatingImageIndex: number | null;
   isApproving: boolean;
   isExporting: boolean;
   onApprovalNotesChange: (value: string) => void;
@@ -16,6 +17,7 @@ type CampaignDetailProps = {
     index: number,
     payload: Pick<AdVariant, "headline" | "primary_text" | "cta" | "image_prompt">,
   ) => void;
+  onGenerateVariantImage: (index: number) => void;
   onApprove: () => void;
   onExport: () => void;
 };
@@ -25,11 +27,13 @@ function CampaignDetail({
   approvalNotes,
   isSaving,
   savingVariantIndex,
+  generatingImageIndex,
   isApproving,
   isExporting,
   onApprovalNotesChange,
   onSaveNotes,
   onSaveVariant,
+  onGenerateVariantImage,
   onApprove,
   onExport,
 }: CampaignDetailProps) {
@@ -118,7 +122,9 @@ function CampaignDetail({
               variant={variant}
               index={index}
               isSaving={savingVariantIndex === index}
+              isGeneratingImage={generatingImageIndex === index}
               onSave={onSaveVariant}
+              onGenerateImage={onGenerateVariantImage}
             />
           ))}
         </div>

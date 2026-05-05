@@ -135,6 +135,8 @@ class AdVariant:
     cta: str
     image_prompt: str
     generated_asset: GeneratedAsset | None = None
+    image_status: str = "prompt_only"
+    image_error: str | None = None
     review_notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

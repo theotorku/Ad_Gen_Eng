@@ -99,6 +99,15 @@ export async function updateCampaignVariant(
   });
 }
 
+export async function generateVariantImage(
+  campaignId: string,
+  variantIndex: number,
+): Promise<CampaignRecord> {
+  return requestJson<CampaignRecord>(`/campaigns/${campaignId}/variants/${variantIndex}/generate-image`, {
+    method: "POST",
+  });
+}
+
 export async function exportCampaignText(campaignId: string): Promise<string> {
   return requestText(`/campaigns/${campaignId}/export.txt`);
 }
