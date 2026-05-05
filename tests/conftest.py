@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import shutil
 import sys
-import tempfile
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
@@ -15,10 +15,11 @@ if str(SRC) not in sys.path:
 
 @pytest.fixture
 def local_tmp_path(request):
-    base = ROOT / "tests" / ".tmp"
+    base = ROOT / "data" / ".tmp" / "pytest"
     base.mkdir(parents=True, exist_ok=True)
-    path = Path(tempfile.mkdtemp(
-        prefix=f"{request.node.name}-", dir=str(base)))
+    safe_name = "".join(char if char.isalnum() else "-" for char in request.node.name)
+    path = base / f"{safe_name}-{uuid4().hex[:8]}"
+    path.mkdir()
     try:
         yield path
     finally:

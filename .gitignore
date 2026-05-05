@@ -22,12 +22,14 @@ __pycache__/
 
 # --- data + generated assets ---
 data/*.db
+data/.tmp/
 data/generated_assets/
 output/
 tests/.tmp/
 
 # --- screenshots / scratch ---
 refactored-ui-*.png
+*-server*.log
 .playwright-cli/
 .playwright-mcp/
 

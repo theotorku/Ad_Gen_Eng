@@ -139,8 +139,18 @@ These defaults preserve the current local behavior while moving the engine onto 
 - `OPENAI_IMAGE_QUALITY=medium`
 - `OPENAI_IMAGE_BACKGROUND=auto`
 - `OPENAI_IMAGE_OUTPUT_FORMAT=png`
-- `OPENAI_IMAGE_MODERATION=auto`
 - `OPENAI_IMAGE_OUTPUT_DIR=./data/generated_assets`
+
+Example:
+
+```powershell
+$env:AD_ENGINE_IMAGE_PROVIDER = 'openai_images'
+$env:OPENAI_API_KEY = 'your-api-key'
+$env:OPENAI_IMAGE_MODEL = 'gpt-image-2'
+python main.py serve
+```
+
+Use `AD_ENGINE_IMAGE_PROVIDER=prompt_template` when you want local prompt generation without paid image calls.
 
 ## Frontend
 

@@ -91,17 +91,18 @@ Common backend settings:
 - `AD_ENGINE_COPY_PROVIDER`
 - `AD_ENGINE_IMAGE_PROVIDER`
 - `OPENAI_API_KEY`
-- `OPENAI_IMAGE_MODEL`
+- `OPENAI_IMAGE_MODEL`, defaulting to `gpt-image-2`
 - `OPENAI_IMAGE_SIZE`
 - `OPENAI_IMAGE_QUALITY`
 - `OPENAI_IMAGE_BACKGROUND`
 - `OPENAI_IMAGE_OUTPUT_FORMAT`
-- `OPENAI_IMAGE_MODERATION`
 - `OPENAI_IMAGE_OUTPUT_DIR`
 
 Suggested environment defaults:
 
 - local: `AD_ENGINE_DB_BACKEND=sqlite`
+- local without image costs: `AD_ENGINE_IMAGE_PROVIDER=prompt_template`
+- local with generated images: `AD_ENGINE_IMAGE_PROVIDER=openai_images` and `OPENAI_IMAGE_MODEL=gpt-image-2`
 - staging: move to a managed database before shared testing
 - production: avoid SQLite and local asset-only storage
 
@@ -163,6 +164,8 @@ Recommended production path:
 2. upload it to object storage
 3. store only the asset URL or object key in the campaign record
 4. serve it through signed URLs or a stable public asset path
+
+Also account for OpenAI Images API cost, rate limits, and latency in staging and production. One campaign can generate multiple variants, and each variant may create a separate image.
 
 ## Security and Secrets
 

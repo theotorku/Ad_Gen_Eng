@@ -1,143 +1,235 @@
-Ad Generation Engine MVP
-========================
+Good—now we’re turning this into something that actually scales.
 
-Goal
-----
-Build a service that turns a structured campaign brief into a reusable ad package:
+You don’t need a full SaaS yet. You need a **lean, semi-automated system** that:
 
-- campaign strategy summary
-- audience-specific messaging angles
-- headline and body copy variants
-- image generation prompts
-- CTA recommendations
-- simple quality and compliance checks
+1. Takes a company
+2. Generates ads + copy
+3. Prepares outreach message
+4. Outputs something you can send immediately
 
-The MVP should be deterministic, easy to run locally, and structured so real model providers can replace the mock logic later.
+---
 
-Primary User Flow
------------------
-1. A user submits a campaign brief.
-2. The engine validates the brief and fills small defaults.
-3. A planning stage extracts strategy, hooks, and channel guidance.
-4. A copy stage creates several ad variants for each requested channel.
-5. An asset stage creates image prompts aligned to each variant.
-6. A review stage scores the output and flags obvious issues.
-7. The engine returns a single ad bundle object.
+# 🧠 SYSTEM OVERVIEW (what we’re building)
 
-MVP Scope
----------
-- Input: one structured brief per request
-- Output: one structured ad bundle with multiple variants
-- Channels: `facebook`, `instagram`, `linkedin`, `google_search`
-- Providers: local rule-based generators only for now
-- Persistence: none required for the first slice
-- UI: none in the first slice; CLI-first execution is enough
+**Input:**
 
-Non-Goals For First Slice
--------------------------
-- real LLM or image API calls
-- user auth
-- database storage
-- background jobs
-- analytics dashboards
-- human approval workflows
+* Company Name
+* City
+* State
+* Service (default: moving)
 
-Core Domain Objects
--------------------
-CampaignBrief
-- brand name
-- product or service
-- campaign objective
-- target audience
-- key pain points
-- value propositions
-- offer
-- desired tone
-- channels
-- optional constraints
+**Output:**
 
-CreativePlan
-- strategy summary
-- audience promise
-- primary hooks
-- messaging pillars
-- channel notes
+* 2–3 ad concepts
+* Ad copy
+* Image prompts (for GPT Image)
+* Outreach message
 
-AdVariant
-- channel
-- angle
-- headline
-- primary text
-- CTA
-- image prompt
-- review notes
+---
 
-AdBundle
-- normalized brief
-- creative plan
-- variants
-- quality summary
+# ⚙️ STACK (keep it simple)
 
-Suggested Code Structure
-------------------------
-`src/ad_engine/models.py`
-- typed domain models and validation helpers
+Since you’re already using Python:
 
-`src/ad_engine/planner.py`
-- convert a brief into a strategy plan
+* Python (core engine)
+* OpenAI API (copy + prompt generation)
+* Optional: image generation API
+* CLI or simple script (no UI needed yet)
 
-`src/ad_engine/copywriter.py`
-- generate channel-aware copy variants
+---
 
-`src/ad_engine/assets.py`
-- generate aligned image prompts
+# 🧩 SYSTEM FLOW
 
-`src/ad_engine/review.py`
-- perform lightweight quality checks
+```
+lead → enrich → generate ads → generate copy → generate outreach → output bundle
+```
 
-`src/ad_engine/engine.py`
-- orchestrate the end-to-end pipeline
+---
 
-`main.py`
-- local entrypoint for running the pipeline on sample or file input
+# 🧱 PYTHON MINI SYSTEM (plug-and-play)
 
-Pipeline Contract
------------------
-Input:
-- JSON brief from a file path or built-in sample
+This is clean, modular, and Codex-friendly.
 
-Output:
-- JSON ad bundle written to stdout
+```python
+from dataclasses import dataclass
+from typing import List
+from openai import OpenAI
 
-Validation Rules
-----------------
-- brand, product, objective, and audience are required
-- at least one value proposition is required
-- at least one channel is required
-- unsupported channels should fail fast
-- missing tone defaults to `confident`
+client = OpenAI()
 
-Generation Strategy
--------------------
-The MVP should use predictable templates plus light transformation rules:
+# ---------------------------
+# DATA STRUCTURE
+# ---------------------------
 
-- derive 3 messaging angles from pain points and value props
-- tailor format per channel
-- keep Google Search shorter and more direct
-- keep LinkedIn more professional
-- keep Instagram and Facebook more emotive
+@dataclass
+class Company:
+    name: str
+    city: str
+    state: str
+    service: str = "moving"
 
-Review Rules
-------------
-- flag headlines longer than the channel guideline
-- flag missing offer language when an offer exists in the brief
-- flag repeated headlines across variants
-- summarize overall strengths and risks
+# ---------------------------
+# AD ANGLES
+# ---------------------------
 
-Roadmap After MVP
------------------
-1. Replace local generators with pluggable LLM and image providers.
-2. Add persistence for briefs, bundles, and approvals.
-3. Add a REST API.
-4. Add a lightweight frontend for campaign creation and export.
-5. Add evaluation metrics and human feedback loops.
+AD_ANGLES = [
+    "urgent_move",
+    "trust_builder",
+    "discount_offer",
+    "stress_free"
+]
+
+# ---------------------------
+# COPY GENERATION
+# ---------------------------
+
+def generate_ad_copy(company: Company) -> str:
+    prompt = f"""
+Write a high-converting Facebook ad for a {company.service} company.
+
+Company: {company.name}
+Location: {company.city}, {company.state}
+
+Focus on generating leads quickly.
+Keep it under 100 words.
+Include bullet points and CTA.
+"""
+
+    res = client.chat.completions.create(
+        model="gpt-5.3",
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    return res.choices[0].message.content.strip()
+
+# ---------------------------
+# IMAGE PROMPT GENERATION
+# ---------------------------
+
+def generate_image_prompt(company: Company, angle: str) -> str:
+    base = f"""
+Create a high-converting ad image concept for a {company.service} company in {company.city}, {company.state}.
+
+Angle: {angle}
+
+Include:
+- realistic people
+- local vibe
+- clean composition
+- marketing-focused layout
+- space for headline text
+
+Style: modern, high-converting Facebook ad
+"""
+
+    return base.strip()
+
+# ---------------------------
+# OUTREACH MESSAGE
+# ---------------------------
+
+def generate_outreach(company: Company) -> str:
+    return f"""
+Hey — I made a couple ad concepts for {company.name} targeting people in {company.city} who need movers this week.
+
+These types of ads typically bring in fast, qualified leads.
+
+If you want, I can run a quick 7-day test and send traffic your way.
+
+Want me to send them over?
+""".strip()
+
+# ---------------------------
+# FULL GENERATION PIPELINE
+# ---------------------------
+
+def generate_bundle(company: Company):
+    ad_copy = generate_ad_copy(company)
+
+    image_prompts = [
+        generate_image_prompt(company, angle)
+        for angle in AD_ANGLES[:2]  # keep it lean (2 creatives)
+    ]
+
+    outreach = generate_outreach(company)
+
+    return {
+        "company": company,
+        "ad_copy": ad_copy,
+        "image_prompts": image_prompts,
+        "outreach": outreach
+    }
+
+# ---------------------------
+# EXAMPLE RUN
+# ---------------------------
+
+if __name__ == "__main__":
+    company = Company(
+        name="FastMove Dallas",
+        city="Dallas",
+        state="TX"
+    )
+
+    bundle = generate_bundle(company)
+
+    print("\n--- AD COPY ---\n")
+    print(bundle["ad_copy"])
+
+    print("\n--- IMAGE PROMPTS ---\n")
+    for p in bundle["image_prompts"]:
+        print("-", p, "\n")
+
+    print("\n--- OUTREACH ---\n")
+    print(bundle["outreach"])
+```
+
+---
+
+# 🔥 WHAT THIS GIVES YOU
+
+For each company, you instantly get:
+
+* Ready-to-use ad copy
+* 2 image prompts → paste into GPT Image
+* A clean outreach message
+
+👉 This is your **“send in 5 minutes” system**
+
+---
+
+# 🚀 HOW TO USE THIS (real workflow)
+
+### Step 1 — Pull 10 companies
+
+Google / Yelp / scraper
+
+### Step 2 — Run script
+
+Generate bundles
+
+### Step 3 — Generate images
+
+Paste prompts into GPT Image
+
+### Step 4 — Send outreach
+
+Attach image + message
+
+---
+
+# ⚡ HIGH-LEVERAGE UPGRADE (do this next)
+
+Add:
+
+```python
+def generate_headlines(company):
+    ...
+```
+
+And:
+
+```python
+def generate_offer(company):
+    ...
+```

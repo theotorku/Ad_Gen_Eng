@@ -30,6 +30,14 @@ def test_string_list_fields_are_split_into_single_item(brief_payload):
     assert brief.pain_points == ["single pain point"]
 
 
+@pytest.mark.parametrize("value", [123, {"linkedin": True}])
+def test_invalid_list_field_shape_raises_value_error(brief_payload, value):
+    brief_payload["value_props"] = value
+
+    with pytest.raises(ValueError, match="strings or arrays"):
+        CampaignBrief.from_dict(brief_payload)
+
+
 @pytest.mark.parametrize(
     "field",
     ["brand_name", "product_name", "objective", "target_audience"],

@@ -51,13 +51,23 @@ Registered image provider options currently include:
 - `prompt_template`
 - `openai_images`
 
-When `openai_images` is active, the provider calls the OpenAI Images API, saves generated image files locally, and attaches a generated asset reference to each ad variant. Those files are then served by the API through `/generated-assets/...`.
+When `openai_images` is active, the provider calls the OpenAI Images API with `gpt-image-2` by default, saves generated image files locally, and attaches a generated asset reference to each ad variant. Those files are then served by the API through `/generated-assets/...`.
 
 Provider selection is controlled with environment variables:
 
 - `AD_ENGINE_PLANNING_PROVIDER`
 - `AD_ENGINE_COPY_PROVIDER`
 - `AD_ENGINE_IMAGE_PROVIDER`
+
+OpenAI image generation is configured with:
+
+- `OPENAI_API_KEY`
+- `OPENAI_IMAGE_MODEL` defaults to `gpt-image-2`
+- `OPENAI_IMAGE_SIZE`
+- `OPENAI_IMAGE_QUALITY`
+- `OPENAI_IMAGE_BACKGROUND`
+- `OPENAI_IMAGE_OUTPUT_FORMAT`
+- `OPENAI_IMAGE_OUTPUT_DIR`
 
 New providers should implement the relevant protocol in [providers.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/providers.py>) and then be registered in `build_provider_stack()`.
 
@@ -73,8 +83,6 @@ The main domain objects are:
 - `StoredCampaign`: API record that adds status and metadata around an `AdBundle`
 
 ## Persistence Model
-
-The current store is process-local and in-memory. A server restart clears all campaigns. The store exists mainly to support the API lifecycle endpoints and provide a simple seam for future persistence work.
 
 The persistence layer now supports two backends behind a shared campaign store interface:
 

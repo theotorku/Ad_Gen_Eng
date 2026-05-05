@@ -171,8 +171,10 @@ def _normalize_list(value: Any) -> list[str]:
         return []
     if isinstance(value, str):
         items = [value]
-    else:
+    elif isinstance(value, list):
         items = list(value)
+    else:
+        raise ValueError("List fields must be strings or arrays of strings.")
     cleaned = [_clean_text(str(item)) for item in items]
     return [item for item in cleaned if item]
 

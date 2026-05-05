@@ -78,8 +78,11 @@ OpenAI image provider selection:
 $env:AD_ENGINE_IMAGE_PROVIDER = 'openai_images'
 $env:OPENAI_API_KEY = 'your-api-key'
 $env:OPENAI_IMAGE_MODEL = 'gpt-image-2'
+$env:OPENAI_IMAGE_OUTPUT_DIR = '.\data\generated_assets'
 python main.py serve
 ```
+
+With `openai_images` active, every generated variant makes an OpenAI Images API request. Use `prompt_template` when you only want local, no-cost prompt generation.
 
 ## Testing Strategy
 
@@ -94,7 +97,7 @@ Good next testing additions:
 
 - unit tests for `CampaignBrief` validation
 - provider-level tests for deterministic outputs
-- API route tests against the in-memory store
+- API route tests against the configured campaign store
 - frontend interaction tests for creation, selection, and approval flows
 
 ## Documentation Map

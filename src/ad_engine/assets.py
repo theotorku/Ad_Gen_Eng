@@ -6,12 +6,14 @@ import os
 import re
 from pathlib import Path
 from urllib import error, request
+from uuid import uuid4
 
 from .models import AdVariant, CampaignBrief, GeneratedAsset
 from .providers import ImageProvider
 
 
 DEFAULT_OUTPUT_DIR = "data/generated_assets"
+DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2"
 
 _PROMPT_FIELD_MAX_LENGTH = 280
 _PROMPT_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -69,7 +71,7 @@ class OpenAIImagesProvider(ImageProvider):
     def __init__(self) -> None:
         self.api_key = os.getenv("OPENAI_API_KEY")
         self.model = os.getenv("OPENAI_IMAGE_MODEL",
-                               "gpt-image-1").strip() or "gpt-image-1"
+                               DEFAULT_OPENAI_IMAGE_MODEL).strip() or DEFAULT_OPENAI_IMAGE_MODEL
         self.size = os.getenv("OPENAI_IMAGE_SIZE",
                               "1024x1024").strip() or "1024x1024"
         self.quality = os.getenv(
@@ -78,8 +80,6 @@ class OpenAIImagesProvider(ImageProvider):
             "OPENAI_IMAGE_BACKGROUND", "auto").strip() or "auto"
         self.output_format = os.getenv(
             "OPENAI_IMAGE_OUTPUT_FORMAT", "png").strip() or "png"
-        self.moderation = os.getenv(
-            "OPENAI_IMAGE_MODERATION", "auto").strip() or "auto"
         self.timeout_seconds = int(
             os.getenv("OPENAI_IMAGE_TIMEOUT_SECONDS", "180").strip() or "180")
         self.output_dir = get_generated_asset_root()
@@ -122,7 +122,6 @@ class OpenAIImagesProvider(ImageProvider):
             "quality": self.quality,
             "background": self.background,
             "output_format": self.output_format,
-            "moderation": self.moderation,
         }
         body = json.dumps(payload).encode("utf-8")
         api_request = request.Request(
@@ -151,8 +150,9 @@ class OpenAIImagesProvider(ImageProvider):
         brand = _slugify(brief.brand_name)
         product = _slugify(brief.product_name)
         channel = _slugify(variant.channel)
+        unique_suffix = uuid4().hex[:12]
         extension = "jpg" if self.output_format == "jpeg" else self.output_format
-        return f"{brand}-{product}-{channel}-{index}.{extension}"
+        return f"{brand}-{product}-{channel}-{index}-{unique_suffix}.{extension}"
 
 
 def get_generated_asset_root() -> Path:

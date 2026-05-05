@@ -6,6 +6,8 @@ import VariantCard from "./VariantCard";
 type CampaignDetailProps = {
   campaign: CampaignRecord | null;
   approvalNotes: string;
+  isSaving: boolean;
+  isApproving: boolean;
   onApprovalNotesChange: (value: string) => void;
   onSaveNotes: () => void;
   onApprove: () => void;
@@ -14,6 +16,8 @@ type CampaignDetailProps = {
 function CampaignDetail({
   campaign,
   approvalNotes,
+  isSaving,
+  isApproving,
   onApprovalNotesChange,
   onSaveNotes,
   onApprove,
@@ -41,12 +45,12 @@ function CampaignDetail({
           <span className={campaign.status === "approved" ? "status-badge approved" : "status-badge"}>
             {campaign.status}
           </span>
-          <button className="ghost-action" type="button" onClick={onSaveNotes}>
-            Save notes
+          <button className="ghost-action" type="button" onClick={onSaveNotes} disabled={isSaving}>
+            {isSaving ? "Saving" : "Save notes"}
           </button>
-          <button className="primary-inline" type="button" onClick={onApprove}>
+          <button className="primary-inline" type="button" onClick={onApprove} disabled={isApproving}>
             <CheckCircle2 size={14} />
-            Approve
+            {isApproving ? "Approving" : "Approve"}
           </button>
         </div>
       </div>

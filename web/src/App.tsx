@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { LoaderCircle, RefreshCw } from "lucide-react";
+import { LoaderCircle, Moon, RefreshCw, Sun } from "lucide-react";
 import {
   approveCampaign,
   createCampaign,
@@ -13,6 +13,18 @@ import BriefForm from "./components/BriefForm";
 import CampaignList from "./components/CampaignList";
 import CampaignDetail from "./components/CampaignDetail";
 
+type ThemeMode = "light" | "dark";
+
+const THEME_STORAGE_KEY = "ad_engine_theme";
+
+function getInitialTheme(): ThemeMode {
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === "light" || storedTheme === "dark") {
+    return storedTheme;
+  }
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function App() {
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -20,7 +32,13 @@ function App() {
   const [approvalNotes, setApprovalNotes] = useState("");
   const [statusMessage, setStatusMessage] = useState("Loading campaigns");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [isPending, startTransition] = useTransition();
+  const isWorking = isPending || isCreating || isSaving || isApproving;
+  const isDarkMode = theme === "dark";
 
   const selectedCampaign = useMemo(
     () => campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null,
@@ -30,6 +48,11 @@ function App() {
   useEffect(() => {
     void loadCampaigns();
   }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   async function loadCampaigns(selectedId?: string) {
     try {
@@ -53,6 +76,8 @@ function App() {
   }
 
   async function handleCreateCampaign() {
+    if (isCreating) return;
+    setIsCreating(true);
     try {
       setErrorMessage(null);
       setStatusMessage("Generating campaign bundle");
@@ -63,6 +88,8 @@ function App() {
       const message = error instanceof Error ? error.message : "Unable to create campaign.";
       setErrorMessage(message);
       setStatusMessage("Generation failed");
+    } finally {
+      setIsCreating(false);
     }
   }
 
@@ -84,7 +111,8 @@ function App() {
   }
 
   async function handleSaveNotes() {
-    if (!selectedCampaign) return;
+    if (!selectedCampaign || isSaving) return;
+    setIsSaving(true);
     try {
       setErrorMessage(null);
       setStatusMessage("Updating campaign notes");
@@ -97,11 +125,14 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to update campaign.";
       setErrorMessage(message);
+    } finally {
+      setIsSaving(false);
     }
   }
 
   async function handleApproveCampaign() {
-    if (!selectedCampaign) return;
+    if (!selectedCampaign || isApproving) return;
+    setIsApproving(true);
     try {
       setErrorMessage(null);
       setStatusMessage("Approving campaign");
@@ -111,6 +142,8 @@ function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to approve campaign.";
       setErrorMessage(message);
+    } finally {
+      setIsApproving(false);
     }
   }
 
@@ -151,11 +184,15 @@ function App() {
     });
   }
 
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  }
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={theme}>
       <BriefForm
         formState={formState}
-        isPending={isPending}
+        isPending={isCreating}
         onFieldChange={handleFieldChange}
         onListFieldChange={handleListFieldChange}
         onChannelToggle={handleChannelToggle}
@@ -170,9 +207,18 @@ function App() {
           </div>
           <div className="header-actions">
             <div className="status-chip">
-              {isPending ? <LoaderCircle className="spin" size={12} /> : <RefreshCw size={12} />}
+              {isWorking ? <LoaderCircle className="spin" size={12} /> : <RefreshCw size={12} />}
               <span>{statusMessage}</span>
             </div>
+            <button
+              className="ghost-action theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-pressed={isDarkMode}
+            >
+              {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+              {isDarkMode ? "Light mode" : "Dark mode"}
+            </button>
             <button className="ghost-action" type="button" onClick={() => void loadCampaigns()}>
               Refresh
             </button>
@@ -190,6 +236,8 @@ function App() {
           <CampaignDetail
             campaign={selectedCampaign}
             approvalNotes={approvalNotes}
+            isSaving={isSaving}
+            isApproving={isApproving}
             onApprovalNotesChange={setApprovalNotes}
             onSaveNotes={handleSaveNotes}
             onApprove={handleApproveCampaign}

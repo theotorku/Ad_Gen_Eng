@@ -117,6 +117,23 @@ The app will create:
 
 If the OpenAI image integration is turned on, the campaign can also include real generated images in the review view.
 
+## Turning On GPT Image 2
+
+By default, the app creates image prompts only. To generate real image assets with GPT Image 2, set the OpenAI image provider in your local `.env` file:
+
+```env
+AD_ENGINE_IMAGE_PROVIDER=openai_images
+OPENAI_API_KEY=your-api-key
+OPENAI_IMAGE_MODEL=gpt-image-2
+OPENAI_IMAGE_SIZE=1024x1024
+OPENAI_IMAGE_QUALITY=medium
+OPENAI_IMAGE_BACKGROUND=auto
+OPENAI_IMAGE_OUTPUT_FORMAT=png
+OPENAI_IMAGE_OUTPUT_DIR=./data/generated_assets
+```
+
+Restart the backend after changing these settings. New campaigns will save generated image files under `data/generated_assets` and show them in the campaign detail view.
+
 ## How To Review a Campaign
 
 After generation, select the campaign from the campaign list.
@@ -197,5 +214,5 @@ This is still an MVP. Right now:
 
 - campaigns are generated from structured briefs only
 - direct in-app copy editing is limited
-- image prompts are generated, but image asset creation is still a future step
+- image asset creation requires `AD_ENGINE_IMAGE_PROVIDER=openai_images` and a valid `OPENAI_API_KEY`
 - approval is simple and does not include multi-person workflow

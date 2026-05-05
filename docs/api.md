@@ -67,7 +67,7 @@ Use this route when a campaign variant includes a `generated_asset.path` value a
 
 ### `GET /campaigns`
 
-Lists every campaign in the in-memory store.
+Lists every campaign in the configured campaign store.
 
 Example response shape:
 
@@ -136,4 +136,4 @@ The API returns `404 Not Found` when a campaign ID or route does not exist.
 - Campaign persistence depends on the configured store backend.
 - `POST /bundles` is currently the campaign creation endpoint.
 - `GET /bundles/{id}` and `GET /campaigns/{id}` use the same underlying campaign ID.
-- Generated image files are saved on disk and exposed through `GET /generated-assets/{filename}`.
+- Generated image files are saved on disk and exposed through `GET /generated-assets/{filename}` when `AD_ENGINE_IMAGE_PROVIDER=openai_images` is active.

@@ -8,6 +8,8 @@ function renderDetail(overrides: Partial<Parameters<typeof CampaignDetail>[0]> =
   const props = {
     campaign: buildCampaign(),
     approvalNotes: "",
+    isSaving: false,
+    isApproving: false,
     onApprovalNotesChange: vi.fn(),
     onSaveNotes: vi.fn(),
     onApprove: vi.fn(),
@@ -23,6 +25,8 @@ describe("CampaignDetail", () => {
       <CampaignDetail
         campaign={null}
         approvalNotes=""
+        isSaving={false}
+        isApproving={false}
         onApprovalNotesChange={vi.fn()}
         onSaveNotes={vi.fn()}
         onApprove={vi.fn()}
@@ -62,6 +66,18 @@ describe("CampaignDetail", () => {
     await userEvent.type(screen.getByRole("textbox"), "ok");
 
     expect(props.onApprovalNotesChange).toHaveBeenCalled();
+  });
+
+  it("disables save notes while saving", () => {
+    renderDetail({ isSaving: true });
+
+    expect(screen.getByRole("button", { name: /saving/i })).toBeDisabled();
+  });
+
+  it("disables approve while approving", () => {
+    renderDetail({ isApproving: true });
+
+    expect(screen.getByRole("button", { name: /approving/i })).toBeDisabled();
   });
 
   it("renders Pending when the campaign has not been approved", () => {
