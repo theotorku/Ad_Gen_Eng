@@ -40,8 +40,7 @@ Run the API server:
 python main.py serve
 ```
 
-The server runs the FastAPI app through Uvicorn. The older standard-library
-handler remains in the repo for compatibility tests, but new API work should use
+The server runs the canonical FastAPI app through Uvicorn. API work lives in
 [src/ad_engine/fastapi_app.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/fastapi_app.py>).
 
 Use a custom host or port when needed:

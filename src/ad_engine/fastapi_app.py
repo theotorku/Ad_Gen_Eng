@@ -10,9 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict
 
-from .api import DEFAULT_CORS_ORIGINS, DEFAULT_ORGANIZATION_ID
-from .assets import OpenAIImagesProvider, get_generated_asset_root
+from .assets import get_generated_asset_root
 from .auth import AuthContext, AuthSettings, AuthenticationError, resolve_auth_context
+from .config import DEFAULT_CORS_ORIGINS
 from .engine import AdGenerationEngine
 from .providers import build_provider_stack
 from .store import CampaignStore, StoreSettings, build_campaign_store
@@ -239,6 +239,14 @@ def create_app(
                 detail="Variant index is out of range.",
             )
 
+        image_provider = app.state.engine.providers.image
+        generate_variant_image = getattr(image_provider, "generate_variant_image", None)
+        if generate_variant_image is None:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Image generation requires AD_ENGINE_IMAGE_PROVIDER=openai_images.",
+            )
+
         app.state.store.update_variant_image(
             campaign_id,
             variant_index,
@@ -248,7 +256,7 @@ def create_app(
 
         variant = stored.bundle.variants[variant_index]
         try:
-            asset = OpenAIImagesProvider().generate_variant_image(
+            asset = generate_variant_image(
                 stored.bundle.brief,
                 variant,
                 index=variant_index + 1,
@@ -268,6 +276,18 @@ def create_app(
                 image_status="failed",
                 image_error=str(exc),
             )
+        except Exception as exc:
+            app.state.store.update_variant_image(
+                campaign_id,
+                variant_index,
+                organization_id=auth.organization_id,
+                image_status="failed",
+                image_error="Unexpected image generation error.",
+            )
+            raise HTTPException(
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                detail="Unexpected image generation error.",
+            ) from exc
 
         if updated is None:
             raise HTTPException(
@@ -307,7 +327,7 @@ def create_app(
         _auth_context(app, x_api_key, x_organization_id)
         asset_root = get_generated_asset_root().resolve()
         asset_path = (asset_root / filename.strip()).resolve()
-        if asset_root not in asset_path.parents and asset_path != asset_root:
+        if not asset_path.is_relative_to(asset_root):
             raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Invalid asset path.")
         if not asset_path.exists() or not asset_path.is_file():
             raise HTTPException(
@@ -347,11 +367,6 @@ def _campaign_metadata_from_brief(payload: dict[str, Any]) -> dict[str, Any]:
         "objective": str(payload.get("objective", "")).strip(),
         "channels": payload.get("channels", []),
     }
-
-
-def _organization_id(value: str | None) -> str:
-    normalized = (value or DEFAULT_ORGANIZATION_ID).strip()
-    return normalized or DEFAULT_ORGANIZATION_ID
 
 
 def _auth_context(

@@ -139,6 +139,8 @@ Invoke-RestMethod -Method Patch -Uri http://127.0.0.1:8000/campaigns/<campaign-i
 ### `POST /campaigns/{id}/variants/{index}/generate-image`
 
 Generates or retries a GPT Image 2 asset for one variant. The index is zero-based.
+This endpoint requires `AD_ENGINE_IMAGE_PROVIDER=openai_images`; the default
+`prompt_template` provider only creates prompts.
 
 The response is the updated campaign record. The selected variant will include:
 
@@ -179,6 +181,7 @@ The API returns `400 Bad Request` when:
 - a variant edit targets an out-of-range index
 - a variant edit field is empty
 - an image generation request targets an out-of-range index
+- image generation is requested while the prompt-only image provider is active
 
 The API returns `404 Not Found` when a campaign ID or route does not exist.
 

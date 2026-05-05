@@ -3,8 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-
-DEFAULT_ORGANIZATION_ID = "default"
+from .config import DEFAULT_ORGANIZATION_ID
 
 
 @dataclass(frozen=True, slots=True)

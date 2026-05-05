@@ -30,8 +30,8 @@ The system currently supports two ways to use it:
 - [assets.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/assets.py>): default image prompt provider
 - [review.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/review.py>): quality checks
 - [store.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/store.py>): memory, SQLite, and optional Postgres campaign persistence
-- [fastapi_app.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/fastapi_app.py>): FastAPI routes and app factory
-- [api.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/api.py>): legacy standard-library handler retained for compatibility coverage
+- [fastapi_app.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/fastapi_app.py>): canonical FastAPI routes and app factory
+- [config.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/config.py>): shared service defaults
 
 ## Provider Model
 

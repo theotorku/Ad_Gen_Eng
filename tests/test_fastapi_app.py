@@ -9,9 +9,12 @@ from ad_engine.providers import build_provider_stack
 from ad_engine.store import InMemoryCampaignStore
 
 
-def _client() -> TestClient:
+def _client(image_provider=None) -> TestClient:
+    providers = build_provider_stack()
+    if image_provider is not None:
+        providers.image = image_provider
     app = create_app(
-        engine=AdGenerationEngine(build_provider_stack()),
+        engine=AdGenerationEngine(providers),
         store=InMemoryCampaignStore(),
     )
     return TestClient(app)
@@ -93,6 +96,12 @@ def test_fastapi_exports_campaign_text(brief_payload):
 
 def test_fastapi_generates_one_variant_image(monkeypatch, brief_payload):
     class FakeOpenAIImagesProvider:
+        provider_name = "fake_images"
+
+        def attach_image_prompts(self, brief, variants):
+            for variant in variants:
+                variant.image_prompt = "Fake prompt."
+
         def generate_variant_image(self, brief, variant, *, index=1):
             return GeneratedAsset(
                 path="/generated-assets/fake.png",
@@ -101,8 +110,7 @@ def test_fastapi_generates_one_variant_image(monkeypatch, brief_payload):
                 prompt=variant.image_prompt,
             )
 
-    monkeypatch.setattr("ad_engine.fastapi_app.OpenAIImagesProvider", FakeOpenAIImagesProvider)
-    client = _client()
+    client = _client(image_provider=FakeOpenAIImagesProvider())
     created = client.post("/bundles", json=brief_payload)
     campaign_id = created.json()["id"]
 
@@ -116,11 +124,16 @@ def test_fastapi_generates_one_variant_image(monkeypatch, brief_payload):
 
 def test_fastapi_records_variant_image_failure(monkeypatch, brief_payload):
     class FakeOpenAIImagesProvider:
+        provider_name = "fake_images"
+
+        def attach_image_prompts(self, brief, variants):
+            for variant in variants:
+                variant.image_prompt = "Fake prompt."
+
         def generate_variant_image(self, brief, variant, *, index=1):
             raise ValueError("Provider timed out.")
 
-    monkeypatch.setattr("ad_engine.fastapi_app.OpenAIImagesProvider", FakeOpenAIImagesProvider)
-    client = _client()
+    client = _client(image_provider=FakeOpenAIImagesProvider())
     created = client.post("/bundles", json=brief_payload)
     campaign_id = created.json()["id"]
 
@@ -131,6 +144,41 @@ def test_fastapi_records_variant_image_failure(monkeypatch, brief_payload):
     assert variant["image_status"] == "failed"
     assert variant["generated_asset"] is None
     assert variant["image_error"] == "Provider timed out."
+
+
+def test_fastapi_rejects_image_generation_when_provider_is_prompt_only(brief_payload):
+    client = _client()
+    created = client.post("/bundles", json=brief_payload)
+    campaign_id = created.json()["id"]
+
+    response = client.post(f"/campaigns/{campaign_id}/variants/0/generate-image")
+
+    assert response.status_code == 400
+    assert "openai_images" in response.json()["detail"]
+
+
+def test_fastapi_records_unexpected_image_generation_error(brief_payload):
+    class ExplodingImageProvider:
+        provider_name = "exploding_images"
+
+        def attach_image_prompts(self, brief, variants):
+            for variant in variants:
+                variant.image_prompt = "Fake prompt."
+
+        def generate_variant_image(self, brief, variant, *, index=1):
+            raise RuntimeError("socket vanished")
+
+    client = _client(image_provider=ExplodingImageProvider())
+    created = client.post("/bundles", json=brief_payload)
+    campaign_id = created.json()["id"]
+
+    response = client.post(f"/campaigns/{campaign_id}/variants/0/generate-image")
+    fetched = client.get(f"/campaigns/{campaign_id}")
+
+    assert response.status_code == 500
+    variant = fetched.json()["bundle"]["variants"][0]
+    assert variant["image_status"] == "failed"
+    assert variant["image_error"] == "Unexpected image generation error."
 
 
 def test_fastapi_required_auth_maps_key_to_workspace(monkeypatch, brief_payload):
