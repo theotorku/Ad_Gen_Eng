@@ -1,7 +1,7 @@
 import type { AdVariant, CampaignBrief, CampaignListResponse, CampaignRecord } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
-const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID ?? "default";
+const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID || "default";
 const API_KEY = import.meta.env.VITE_API_KEY;
 
 function buildHeaders(init?: RequestInit): HeadersInit {
