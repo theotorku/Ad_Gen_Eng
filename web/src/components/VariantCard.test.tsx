@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import VariantCard from "./VariantCard";
 import { sampleVariant } from "../test-fixtures";
 
@@ -42,5 +43,20 @@ describe("VariantCard", () => {
     const img = screen.getByRole("img") as HTMLImageElement;
     expect(img.src).toContain("/assets/foo.png");
     expect(img.alt).toBe("Ship campaigns in hours, not weeks");
+  });
+
+  it("edits and saves variant copy", async () => {
+    const onSave = vi.fn();
+    render(<VariantCard variant={sampleVariant} index={2} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }));
+    await userEvent.clear(screen.getByLabelText(/headline/i));
+    await userEvent.type(screen.getByLabelText(/headline/i), "New headline");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ headline: "New headline" }),
+    );
   });
 });

@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict
 
 from .api import DEFAULT_CORS_ORIGINS, DEFAULT_ORGANIZATION_ID
@@ -30,6 +30,15 @@ class CampaignApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     approval_notes: str | None = None
+
+
+class VariantUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    headline: str | None = None
+    primary_text: str | None = None
+    cta: str | None = None
+    image_prompt: str | None = None
 
 
 def create_app(
@@ -179,6 +188,57 @@ def create_app(
             )
         return stored.to_dict()
 
+    @app.patch("/campaigns/{campaign_id}/variants/{variant_index}")
+    def update_variant(
+        campaign_id: str,
+        variant_index: int,
+        payload: VariantUpdateRequest,
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
+        try:
+            stored = app.state.store.update_variant(
+                campaign_id,
+                variant_index,
+                organization_id=auth.organization_id,
+                headline=payload.headline,
+                primary_text=payload.primary_text,
+                cta=payload.cta,
+                image_prompt=payload.image_prompt,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
+
+        if stored is None:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' was not found.",
+            )
+        return stored.to_dict()
+
+    @app.get("/campaigns/{campaign_id}/export.txt")
+    def export_campaign_text(
+        campaign_id: str,
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+    ) -> PlainTextResponse:
+        auth = _auth_context(app, x_api_key, x_organization_id)
+        stored = app.state.store.get(
+            campaign_id, organization_id=auth.organization_id
+        )
+        if stored is None:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail=f"Campaign '{campaign_id}' was not found.",
+            )
+
+        filename = f"{_safe_filename(stored.bundle.brief.brand_name)}-campaign.txt"
+        return PlainTextResponse(
+            _campaign_export_text(stored.to_dict()),
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
     @app.get("/generated-assets/{filename:path}")
     def generated_asset(
         filename: str,
@@ -258,3 +318,47 @@ def _load_cors_origins() -> tuple[frozenset[str], bool]:
     if "*" in entries:
         return frozenset(), True
     return frozenset(entries), False
+
+
+def _campaign_export_text(campaign: dict[str, Any]) -> str:
+    bundle = campaign["bundle"]
+    brief = bundle["brief"]
+    plan = bundle["creative_plan"]
+    lines = [
+        f"Campaign: {brief['brand_name']}",
+        f"Product: {brief['product_name']}",
+        f"Objective: {brief['objective']}",
+        f"Status: {campaign['status']}",
+        "",
+        "Strategy",
+        plan["strategy_summary"],
+        plan["audience_promise"],
+        "",
+        "Messaging pillars",
+        *[f"- {pillar}" for pillar in plan["messaging_pillars"]],
+        "",
+        "Variants",
+    ]
+
+    for index, variant in enumerate(bundle["variants"], start=1):
+        lines.extend(
+            [
+                "",
+                f"{index}. {variant['channel']} / {variant['angle']}",
+                f"Headline: {variant['headline']}",
+                f"Primary text: {variant['primary_text']}",
+                f"CTA: {variant['cta']}",
+                f"Image prompt: {variant['image_prompt']}",
+            ]
+        )
+
+    if campaign.get("approval_notes"):
+        lines.extend(["", "Approval notes", campaign["approval_notes"]])
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def _safe_filename(value: str) -> str:
+    cleaned = "".join(char.lower() if char.isalnum() else "-" for char in value)
+    collapsed = "-".join(part for part in cleaned.split("-") if part)
+    return collapsed or "campaign"

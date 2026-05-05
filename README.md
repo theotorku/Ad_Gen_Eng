@@ -90,7 +90,9 @@ npm run dev -- --host 127.0.0.1 --port 4174
 - `GET /campaigns`: list campaigns in memory
 - `GET /campaigns/{id}`: fetch campaign details, status, and bundle
 - `PATCH /campaigns/{id}`: update campaign status, notes, or metadata
+- `PATCH /campaigns/{id}/variants/{index}`: edit generated variant copy and prompt text
 - `POST /campaigns/{id}/approve`: mark a campaign approved
+- `GET /campaigns/{id}/export.txt`: export a campaign as plain text
 
 `GET /health` also reports the active database backend.
 
@@ -122,6 +124,12 @@ Approve a campaign:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/campaigns/<campaign-id>/approve -ContentType 'application/json' -Body '{"approval_notes":"Approved for launch"}'
+```
+
+Edit a generated variant:
+
+```powershell
+Invoke-RestMethod -Method Patch -Uri http://127.0.0.1:8000/campaigns/<campaign-id>/variants/0 -ContentType 'application/json' -Body '{"headline":"Updated launch headline","cta":"Book now"}'
 ```
 
 ## Providers
@@ -162,7 +170,7 @@ The React dashboard is a lightweight SaaS MVP shell with:
 
 - campaign creation form
 - campaign list view
-- campaign detail and approval workspace
+- campaign detail, copy editing, export, and approval workspace
 
 Set a custom API base URL when needed:
 

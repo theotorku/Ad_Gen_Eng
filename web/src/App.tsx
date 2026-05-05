@@ -3,11 +3,13 @@ import { LoaderCircle, Moon, RefreshCw, Sun } from "lucide-react";
 import {
   approveCampaign,
   createCampaign,
+  exportCampaignText,
   fetchCampaign,
   fetchCampaigns,
   updateCampaign,
+  updateCampaignVariant,
 } from "./api";
-import type { CampaignBrief, CampaignRecord } from "./types";
+import type { AdVariant, CampaignBrief, CampaignRecord } from "./types";
 import { SAMPLE_FORM } from "./constants";
 import BriefForm from "./components/BriefForm";
 import CampaignList from "./components/CampaignList";
@@ -34,10 +36,12 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingVariantIndex, setSavingVariantIndex] = useState<number | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [isPending, startTransition] = useTransition();
-  const isWorking = isPending || isCreating || isSaving || isApproving;
+  const isWorking = isPending || isCreating || isSaving || isApproving || savingVariantIndex !== null || isExporting;
   const isDarkMode = theme === "dark";
 
   const selectedCampaign = useMemo(
@@ -147,6 +151,51 @@ function App() {
     }
   }
 
+  async function handleSaveVariant(
+    variantIndex: number,
+    payload: Pick<AdVariant, "headline" | "primary_text" | "cta" | "image_prompt">,
+  ) {
+    if (!selectedCampaign || savingVariantIndex !== null) return;
+    setSavingVariantIndex(variantIndex);
+    try {
+      setErrorMessage(null);
+      setStatusMessage("Updating campaign variant");
+      const updated = await updateCampaignVariant(selectedCampaign.id, variantIndex, payload);
+      replaceCampaign(updated);
+      setStatusMessage("Campaign variant updated");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to update variant.";
+      setErrorMessage(message);
+      setStatusMessage("Variant update failed");
+    } finally {
+      setSavingVariantIndex(null);
+    }
+  }
+
+  async function handleExportCampaign() {
+    if (!selectedCampaign || isExporting) return;
+    setIsExporting(true);
+    try {
+      setErrorMessage(null);
+      setStatusMessage("Preparing export");
+      const text = await exportCampaignText(selectedCampaign.id);
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${selectedCampaign.bundle.brief.brand_name.replace(/\W+/g, "-").toLowerCase()}-campaign.txt`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+      setStatusMessage("Campaign exported");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to export campaign.";
+      setErrorMessage(message);
+      setStatusMessage("Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   function replaceCampaign(nextCampaign: CampaignRecord) {
     startTransition(() => {
       setCampaigns((current) => {
@@ -237,10 +286,14 @@ function App() {
             campaign={selectedCampaign}
             approvalNotes={approvalNotes}
             isSaving={isSaving}
+            savingVariantIndex={savingVariantIndex}
             isApproving={isApproving}
+            isExporting={isExporting}
             onApprovalNotesChange={setApprovalNotes}
             onSaveNotes={handleSaveNotes}
+            onSaveVariant={handleSaveVariant}
             onApprove={handleApproveCampaign}
+            onExport={handleExportCampaign}
           />
         </section>
       </main>

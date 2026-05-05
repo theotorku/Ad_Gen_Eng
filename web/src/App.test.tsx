@@ -8,9 +8,11 @@ import { buildCampaign } from "./test-fixtures";
 vi.mock("./api", () => ({
   approveCampaign: vi.fn(),
   createCampaign: vi.fn(),
+  exportCampaignText: vi.fn(),
   fetchCampaign: vi.fn(),
   fetchCampaigns: vi.fn(),
   updateCampaign: vi.fn(),
+  updateCampaignVariant: vi.fn(),
 }));
 
 function deferred<T>() {

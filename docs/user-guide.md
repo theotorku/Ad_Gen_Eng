@@ -9,6 +9,8 @@ For each campaign, the app can help you:
 - create messaging ideas
 - generate multiple ad variants
 - review the copy and prompts
+- edit generated variant copy
+- export campaign copy as text
 - save notes
 - approve a campaign for later use
 
@@ -96,6 +98,8 @@ You can:
 
 - read the strategy summary
 - inspect generated ad variants
+- edit headlines, primary text, CTAs, and image prompts
+- export the campaign as a text bundle
 - review the image prompts
 - add approval notes
 - approve the campaign
@@ -145,7 +149,28 @@ Check these areas:
 - the variants: do the headlines and body copy feel usable?
 - the image prompts: do they match the brand and audience?
 
-If something feels off, update the campaign brief and generate a new campaign.
+If a variant is close but needs final polish, use `Edit` on that variant. If the strategy is wrong, update the campaign brief and generate a new campaign.
+
+## How To Edit Generated Variants
+
+1. Open a campaign.
+2. Select `Edit` on a generated variant.
+3. Update the headline, primary text, CTA, or image prompt.
+4. Select `Save`.
+
+The campaign keeps the edited variant and updates the campaign timestamp.
+
+## How To Export a Campaign
+
+Open a campaign and select `Export`.
+
+The app creates a plain-text campaign bundle with:
+
+- campaign summary
+- strategy
+- messaging pillars
+- edited variants
+- approval notes, when present
 
 ## How To Add Notes
 
@@ -206,13 +231,14 @@ The frontend is usually pointing at the wrong backend URL or port. Make sure:
 
 ### Can I edit generated copy directly in the app?
 
-Not yet. Right now the app is focused on generating, reviewing, and approving campaign output.
+Yes. Open a campaign, select `Edit` on a variant, and save the revised copy.
 
 ## Current Limits
 
 This is still an MVP. Right now:
 
 - campaigns are generated from structured briefs only
-- direct in-app copy editing is limited
+- direct in-app editing currently covers generated variant copy and image prompts
+- export is plain text only
 - image asset creation requires `AD_ENGINE_IMAGE_PROVIDER=openai_images` and a valid `OPENAI_API_KEY`
 - approval is simple and does not include multi-person workflow

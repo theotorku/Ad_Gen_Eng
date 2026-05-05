@@ -85,6 +85,36 @@ def test_approve_sets_status_and_timestamp(bundle):
     assert approved.approved_at is not None
 
 
+def test_update_variant_edits_copy(bundle):
+    store = InMemoryCampaignStore()
+    stored = store.create(bundle)
+
+    updated = store.update_variant(
+        stored.campaign_id,
+        0,
+        headline="Edited headline",
+        primary_text="Edited primary text",
+        cta="Start now",
+        image_prompt="Edited image prompt",
+    )
+
+    assert updated is not None
+    variant = updated.bundle.variants[0]
+    assert variant.headline == "Edited headline"
+    assert variant.primary_text == "Edited primary text"
+    assert variant.cta == "Start now"
+    assert variant.image_prompt == "Edited image prompt"
+    assert updated.updated_at != stored.created_at
+
+
+def test_update_variant_rejects_out_of_range_index(bundle):
+    store = InMemoryCampaignStore()
+    stored = store.create(bundle)
+
+    with pytest.raises(ValueError, match="out of range"):
+        store.update_variant(stored.campaign_id, 99, headline="Nope")
+
+
 def test_unsupported_status_raises(bundle):
     store = InMemoryCampaignStore()
     stored = store.create(bundle)
@@ -150,3 +180,17 @@ def test_sqlite_approve_persists(bundle, local_tmp_path):
     assert fetched is not None
     assert fetched.status == "approved"
     assert fetched.approval_notes == "Ship it"
+
+
+def test_sqlite_update_variant_persists(bundle, local_tmp_path):
+    db_path = str(local_tmp_path / "ad_engine.db")
+    store = SQLiteCampaignStore(db_path)
+    stored = store.create(bundle)
+
+    store.update_variant(stored.campaign_id, 0, headline="Edited headline")
+
+    fresh = SQLiteCampaignStore(db_path)
+    fetched = fresh.get(stored.campaign_id)
+
+    assert fetched is not None
+    assert fetched.bundle.variants[0].headline == "Edited headline"

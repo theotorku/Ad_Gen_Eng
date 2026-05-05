@@ -9,10 +9,14 @@ function renderDetail(overrides: Partial<Parameters<typeof CampaignDetail>[0]> =
     campaign: buildCampaign(),
     approvalNotes: "",
     isSaving: false,
+    savingVariantIndex: null,
     isApproving: false,
+    isExporting: false,
     onApprovalNotesChange: vi.fn(),
     onSaveNotes: vi.fn(),
+    onSaveVariant: vi.fn(),
     onApprove: vi.fn(),
+    onExport: vi.fn(),
     ...overrides,
   };
   render(<CampaignDetail {...props} />);
@@ -26,10 +30,14 @@ describe("CampaignDetail", () => {
         campaign={null}
         approvalNotes=""
         isSaving={false}
+        savingVariantIndex={null}
         isApproving={false}
+        isExporting={false}
         onApprovalNotesChange={vi.fn()}
         onSaveNotes={vi.fn()}
+        onSaveVariant={vi.fn()}
         onApprove={vi.fn()}
+        onExport={vi.fn()}
       />,
     );
 
@@ -60,6 +68,14 @@ describe("CampaignDetail", () => {
     expect(props.onSaveNotes).toHaveBeenCalledTimes(1);
   });
 
+  it("calls onExport when the export button is clicked", async () => {
+    const props = renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /export/i }));
+
+    expect(props.onExport).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onApprovalNotesChange when the textarea is edited", async () => {
     const props = renderDetail();
 
@@ -78,6 +94,12 @@ describe("CampaignDetail", () => {
     renderDetail({ isApproving: true });
 
     expect(screen.getByRole("button", { name: /approving/i })).toBeDisabled();
+  });
+
+  it("disables export while exporting", () => {
+    renderDetail({ isExporting: true });
+
+    expect(screen.getByRole("button", { name: /exporting/i })).toBeDisabled();
   });
 
   it("renders Pending when the campaign has not been approved", () => {

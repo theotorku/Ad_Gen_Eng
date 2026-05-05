@@ -1,4 +1,4 @@
-import type { CampaignBrief, CampaignListResponse, CampaignRecord } from "./types";
+import type { AdVariant, CampaignBrief, CampaignListResponse, CampaignRecord } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID ?? "default";
@@ -30,6 +30,25 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return (await response.json()) as T;
+}
+
+async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: buildHeaders(init),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: string;
+      error?: string;
+    } | null;
+    throw new Error(
+      payload?.error ?? payload?.detail ?? `Request failed with status ${response.status}`,
+    );
+  }
+
+  return response.text();
 }
 
 export async function fetchCampaigns(): Promise<CampaignRecord[]> {
@@ -67,4 +86,19 @@ export async function approveCampaign(campaignId: string, approvalNotes: string)
     method: "POST",
     body: JSON.stringify({ approval_notes: approvalNotes }),
   });
+}
+
+export async function updateCampaignVariant(
+  campaignId: string,
+  variantIndex: number,
+  payload: Pick<AdVariant, "headline" | "primary_text" | "cta" | "image_prompt">,
+): Promise<CampaignRecord> {
+  return requestJson<CampaignRecord>(`/campaigns/${campaignId}/variants/${variantIndex}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function exportCampaignText(campaignId: string): Promise<string> {
+  return requestText(`/campaigns/${campaignId}/export.txt`);
 }

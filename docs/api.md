@@ -119,6 +119,28 @@ Supported statuses:
 - `draft`
 - `approved`
 
+### `PATCH /campaigns/{id}/variants/{index}`
+
+Updates editable fields for one generated variant. The index is zero-based.
+
+Supported payload fields:
+
+- `headline`
+- `primary_text`
+- `cta`
+- `image_prompt`
+
+Example:
+
+```powershell
+Invoke-RestMethod -Method Patch -Uri http://127.0.0.1:8000/campaigns/<campaign-id>/variants/0 -ContentType 'application/json' -Body '{"headline":"Updated launch headline","primary_text":"Updated campaign body copy."}'
+```
+
+### `GET /campaigns/{id}/export.txt`
+
+Returns a plain-text campaign export containing the brief summary, strategy,
+messaging pillars, variants, and approval notes.
+
 ### `POST /campaigns/{id}/approve`
 
 Approves a campaign and optionally attaches approval notes.
@@ -138,6 +160,8 @@ The API returns `400 Bad Request` when:
 - an unsupported channel is requested
 - a patch field has the wrong type
 - an unsupported campaign status is supplied
+- a variant edit targets an out-of-range index
+- a variant edit field is empty
 
 The API returns `404 Not Found` when a campaign ID or route does not exist.
 

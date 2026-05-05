@@ -1,5 +1,5 @@
-import { CheckCircle2, Sparkles } from "lucide-react";
-import type { CampaignRecord } from "../types";
+import { CheckCircle2, Download, Sparkles } from "lucide-react";
+import type { AdVariant, CampaignRecord } from "../types";
 import { formatTimestamp } from "../utils";
 import VariantCard from "./VariantCard";
 
@@ -7,20 +7,31 @@ type CampaignDetailProps = {
   campaign: CampaignRecord | null;
   approvalNotes: string;
   isSaving: boolean;
+  savingVariantIndex: number | null;
   isApproving: boolean;
+  isExporting: boolean;
   onApprovalNotesChange: (value: string) => void;
   onSaveNotes: () => void;
+  onSaveVariant: (
+    index: number,
+    payload: Pick<AdVariant, "headline" | "primary_text" | "cta" | "image_prompt">,
+  ) => void;
   onApprove: () => void;
+  onExport: () => void;
 };
 
 function CampaignDetail({
   campaign,
   approvalNotes,
   isSaving,
+  savingVariantIndex,
   isApproving,
+  isExporting,
   onApprovalNotesChange,
   onSaveNotes,
+  onSaveVariant,
   onApprove,
+  onExport,
 }: CampaignDetailProps) {
   if (!campaign) {
     return (
@@ -47,6 +58,10 @@ function CampaignDetail({
           </span>
           <button className="ghost-action" type="button" onClick={onSaveNotes} disabled={isSaving}>
             {isSaving ? "Saving" : "Save notes"}
+          </button>
+          <button className="ghost-action" type="button" onClick={onExport} disabled={isExporting}>
+            <Download size={14} />
+            {isExporting ? "Exporting" : "Export"}
           </button>
           <button className="primary-inline" type="button" onClick={onApprove} disabled={isApproving}>
             <CheckCircle2 size={14} />
@@ -97,8 +112,14 @@ function CampaignDetail({
           <h4>Generated variants</h4>
         </div>
         <div className="variant-grid">
-          {campaign.bundle.variants.map((variant) => (
-            <VariantCard key={`${variant.channel}-${variant.angle}`} variant={variant} />
+          {campaign.bundle.variants.map((variant, index) => (
+            <VariantCard
+              key={`${variant.channel}-${variant.angle}`}
+              variant={variant}
+              index={index}
+              isSaving={savingVariantIndex === index}
+              onSave={onSaveVariant}
+            />
           ))}
         </div>
       </section>

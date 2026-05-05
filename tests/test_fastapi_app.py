@@ -62,6 +62,34 @@ def test_fastapi_rejects_invalid_brief(brief_payload):
     assert "brand_name" in response.json()["detail"]
 
 
+def test_fastapi_updates_variant_copy(brief_payload):
+    client = _client()
+    created = client.post("/bundles", json=brief_payload)
+    campaign_id = created.json()["id"]
+
+    response = client.patch(
+        f"/campaigns/{campaign_id}/variants/0",
+        json={"headline": "Edited headline", "cta": "Start now"},
+    )
+
+    assert response.status_code == 200
+    variant = response.json()["bundle"]["variants"][0]
+    assert variant["headline"] == "Edited headline"
+    assert variant["cta"] == "Start now"
+
+
+def test_fastapi_exports_campaign_text(brief_payload):
+    client = _client()
+    created = client.post("/bundles", json=brief_payload)
+    campaign_id = created.json()["id"]
+
+    response = client.get(f"/campaigns/{campaign_id}/export.txt")
+
+    assert response.status_code == 200
+    assert "Campaign: Northstar AI" in response.text
+    assert "Variants" in response.text
+
+
 def test_fastapi_required_auth_maps_key_to_workspace(monkeypatch, brief_payload):
     monkeypatch.setenv("AD_ENGINE_REQUIRE_API_KEY", "true")
     monkeypatch.setenv("AD_ENGINE_API_KEYS", "alpha-secret:alpha")

@@ -96,6 +96,19 @@ class CampaignStore(Protocol):
     ) -> StoredCampaign | None:
         ...
 
+    def update_variant(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        headline: str | None = None,
+        primary_text: str | None = None,
+        cta: str | None = None,
+        image_prompt: str | None = None,
+    ) -> StoredCampaign | None:
+        ...
+
 
 class InMemoryCampaignStore:
     backend_name = "memory"
@@ -170,6 +183,32 @@ class InMemoryCampaignStore:
             status="approved",
             approval_notes=approval_notes,
         )
+
+    def update_variant(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        headline: str | None = None,
+        primary_text: str | None = None,
+        cta: str | None = None,
+        image_prompt: str | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock:
+            stored = self._items.get(campaign_id)
+            if stored is None or not _matches_organization(stored, organization_id):
+                return None
+
+            _apply_variant_updates(
+                stored,
+                variant_index,
+                headline=headline,
+                primary_text=primary_text,
+                cta=cta,
+                image_prompt=image_prompt,
+            )
+            return stored
 
 
 class SQLiteCampaignStore:
@@ -363,6 +402,66 @@ class SQLiteCampaignStore:
             status="approved",
             approval_notes=approval_notes,
         )
+
+    def update_variant(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        headline: str | None = None,
+        primary_text: str | None = None,
+        cta: str | None = None,
+        image_prompt: str | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock, closing(self._connect()) as connection, connection:
+            if organization_id is None:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = ?
+                    """,
+                    (campaign_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = ? AND organization_id = ?
+                    """,
+                    (campaign_id, _normalize_organization_id(organization_id)),
+                ).fetchone()
+
+            if row is None:
+                return None
+
+            stored = _stored_campaign_from_payload(json.loads(row["payload_json"]))
+            _apply_variant_updates(
+                stored,
+                variant_index,
+                headline=headline,
+                primary_text=primary_text,
+                cta=cta,
+                image_prompt=image_prompt,
+            )
+
+            connection.execute(
+                """
+                UPDATE campaigns
+                SET updated_at = ?,
+                    payload_json = ?
+                WHERE id = ?
+                """,
+                (
+                    stored.updated_at,
+                    json.dumps(stored.to_dict()),
+                    stored.campaign_id,
+                ),
+            )
+
+        return stored
 
     def _initialize_schema(self) -> None:
         with self._lock, closing(self._connect()) as connection:
@@ -605,6 +704,62 @@ class PostgreSQLCampaignStore:
             approval_notes=approval_notes,
         )
 
+    def update_variant(
+        self,
+        campaign_id: str,
+        variant_index: int,
+        *,
+        organization_id: str | None = None,
+        headline: str | None = None,
+        primary_text: str | None = None,
+        cta: str | None = None,
+        image_prompt: str | None = None,
+    ) -> StoredCampaign | None:
+        with self._lock, self._connect() as connection:
+            if organization_id is None:
+                row = connection.execute(
+                    "SELECT payload_json FROM campaigns WHERE id = %s",
+                    (campaign_id,),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT payload_json
+                    FROM campaigns
+                    WHERE id = %s AND organization_id = %s
+                    """,
+                    (campaign_id, _normalize_organization_id(organization_id)),
+                ).fetchone()
+
+            if row is None:
+                return None
+
+            stored = _stored_campaign_from_payload(_coerce_json_payload(row["payload_json"]))
+            _apply_variant_updates(
+                stored,
+                variant_index,
+                headline=headline,
+                primary_text=primary_text,
+                cta=cta,
+                image_prompt=image_prompt,
+            )
+
+            connection.execute(
+                """
+                UPDATE campaigns
+                SET updated_at = %s,
+                    payload_json = %s
+                WHERE id = %s
+                """,
+                (
+                    stored.updated_at,
+                    json.dumps(stored.to_dict()),
+                    stored.campaign_id,
+                ),
+            )
+
+        return stored
+
     def _initialize_schema(self) -> None:
         with self._lock, self._connect() as connection:
             connection.execute(
@@ -680,6 +835,31 @@ def _apply_campaign_updates(
         stored.approved_at = None
 
 
+def _apply_variant_updates(
+    stored: StoredCampaign,
+    variant_index: int,
+    *,
+    headline: str | None,
+    primary_text: str | None,
+    cta: str | None,
+    image_prompt: str | None,
+) -> None:
+    if variant_index < 0 or variant_index >= len(stored.bundle.variants):
+        raise ValueError("Variant index is out of range.")
+
+    variant = stored.bundle.variants[variant_index]
+    if headline is not None:
+        variant.headline = _normalize_editable_text(headline, "headline")
+    if primary_text is not None:
+        variant.primary_text = _normalize_editable_text(primary_text, "primary_text")
+    if cta is not None:
+        variant.cta = _normalize_editable_text(cta, "cta")
+    if image_prompt is not None:
+        variant.image_prompt = _normalize_editable_text(image_prompt, "image_prompt")
+
+    stored.updated_at = _utc_now()
+
+
 def _stored_campaign_from_payload(payload: dict[str, Any]) -> StoredCampaign:
     bundle_payload = payload["bundle"]
     brief_payload = bundle_payload["brief"]
@@ -735,6 +915,15 @@ def _utc_now() -> str:
 def _normalize_organization_id(value: str | None) -> str:
     normalized = (value or "default").strip()
     return normalized or "default"
+
+
+def _normalize_editable_text(value: str, field: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"Field '{field}' cannot be empty.")
+    if len(normalized) > 2000:
+        raise ValueError(f"Field '{field}' exceeds maximum length of 2000 characters.")
+    return normalized
 
 
 def _matches_organization(stored: StoredCampaign, organization_id: str | None) -> bool:
