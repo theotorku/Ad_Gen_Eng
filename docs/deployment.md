@@ -94,6 +94,8 @@ Common backend settings:
 - `AD_ENGINE_DB_BACKEND`
 - `AD_ENGINE_SQLITE_PATH`
 - `AD_ENGINE_POSTGRES_DSN`
+- `AD_ENGINE_REQUIRE_API_KEY`
+- `AD_ENGINE_API_KEYS`
 - `AD_ENGINE_PLANNING_PROVIDER`
 - `AD_ENGINE_COPY_PROVIDER`
 - `AD_ENGINE_IMAGE_PROVIDER`
@@ -112,6 +114,7 @@ Suggested environment defaults:
 - local with generated images: `AD_ENGINE_IMAGE_PROVIDER=openai_images` and `OPENAI_IMAGE_MODEL=gpt-image-2`
 - staging: `AD_ENGINE_DB_BACKEND=postgres` with a managed database
 - production: `AD_ENGINE_DB_BACKEND=postgres`; avoid SQLite and local asset-only storage
+- staging/prod auth: `AD_ENGINE_REQUIRE_API_KEY=true` and `AD_ENGINE_API_KEYS=key:organization_id`
 
 ### Frontend Variables
 
@@ -119,6 +122,7 @@ The main frontend variable is:
 
 - `VITE_API_BASE_URL`
 - `VITE_ORGANIZATION_ID`
+- `VITE_API_KEY`
 
 Examples:
 
@@ -206,6 +210,7 @@ For deployed environments:
 - restrict allowed frontend origins to the actual frontend domains
 - keep staging and production origins separate
 - avoid wildcard CORS once the app is externally reachable
+- require API keys until a full user identity provider is connected
 
 ## Build and Release Flow
 

@@ -17,6 +17,7 @@ python main.py serve
 python main.py serve 127.0.0.1 8011
 $env:AD_ENGINE_DB_BACKEND = 'sqlite'; python main.py serve
 $env:AD_ENGINE_DB_BACKEND = 'postgres'; $env:AD_ENGINE_POSTGRES_DSN = 'postgresql://user:pass@localhost:5432/ad_engine'; python main.py serve
+$env:AD_ENGINE_REQUIRE_API_KEY = 'true'; $env:AD_ENGINE_API_KEYS = 'local-secret:default'; python main.py serve
 python -m compileall src main.py
 npm run dev
 npm run dev -- --host 127.0.0.1 --port 4174
@@ -43,7 +44,8 @@ When changing the API, the usual path is:
 1. start the server with `python main.py serve`
 2. exercise endpoints with `Invoke-RestMethod`
 3. include `X-Organization-ID` when testing workspace isolation
-4. verify the in-memory campaign lifecycle
+4. include `X-API-Key` when `AD_ENGINE_REQUIRE_API_KEY=true`
+5. verify the in-memory campaign lifecycle
 
 If `8000` is already occupied by another local service, start the API on an alternate port and use that same port in any frontend `VITE_API_BASE_URL` override.
 

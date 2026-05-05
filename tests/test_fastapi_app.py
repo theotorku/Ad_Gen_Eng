@@ -60,3 +60,22 @@ def test_fastapi_rejects_invalid_brief(brief_payload):
 
     assert response.status_code == 400
     assert "brand_name" in response.json()["detail"]
+
+
+def test_fastapi_required_auth_maps_key_to_workspace(monkeypatch, brief_payload):
+    monkeypatch.setenv("AD_ENGINE_REQUIRE_API_KEY", "true")
+    monkeypatch.setenv("AD_ENGINE_API_KEYS", "alpha-secret:alpha")
+    client = _client()
+
+    missing = client.get("/campaigns", headers={"X-Organization-ID": "alpha"})
+    created = client.post(
+        "/bundles",
+        json=brief_payload,
+        headers={"X-API-Key": "alpha-secret"},
+    )
+    listed = client.get("/campaigns", headers={"X-API-Key": "alpha-secret"})
+
+    assert missing.status_code == 401
+    assert created.status_code == 201
+    assert created.json()["organization_id"] == "alpha"
+    assert listed.json()["count"] == 1

@@ -2,15 +2,21 @@ import type { CampaignBrief, CampaignListResponse, CampaignRecord } from "./type
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID ?? "default";
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+function buildHeaders(init?: RequestInit): HeadersInit {
+  return {
+    "Content-Type": "application/json",
+    "X-Organization-ID": ORGANIZATION_ID,
+    ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    ...(init?.headers ?? {}),
+  };
+}
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Organization-ID": ORGANIZATION_ID,
-      ...(init?.headers ?? {}),
-    },
+    headers: buildHeaders(init),
   });
 
   if (!response.ok) {

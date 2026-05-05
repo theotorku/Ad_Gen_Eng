@@ -205,6 +205,15 @@ Campaign records include `organization_id`. API clients can scope requests with
 the `X-Organization-ID` header; the dashboard sends `VITE_ORGANIZATION_ID` and
 defaults to `default` for local single-workspace development.
 
+For staging or production, enable the API-key guard:
+
+```powershell
+$env:AD_ENGINE_REQUIRE_API_KEY = 'true'
+$env:AD_ENGINE_API_KEYS = 'secret-key:workspace-a'
+$env:VITE_API_KEY = 'secret-key'
+$env:VITE_ORGANIZATION_ID = 'workspace-a'
+```
+
 ## Good next steps
 
 1. Add campaign filtering, deletion, and audit history.

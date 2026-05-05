@@ -93,6 +93,8 @@ The persistence layer supports three backends behind a shared campaign store int
 
 Each campaign record carries an `organization_id`. API callers scope reads and writes with the `X-Organization-ID` header; omitted headers resolve to the `default` local organization. This is not full authentication yet, but it creates the storage boundary needed for the next auth/workspace milestone.
 
+FastAPI also supports an environment-gated API-key layer. When `AD_ENGINE_REQUIRE_API_KEY=true`, requests must send `X-API-Key`; keys are configured as `key:organization_id` pairs in `AD_ENGINE_API_KEYS`, and the resolved organization becomes the storage scope for the request. This is a staging/prod guardrail, not a replacement for a future user identity provider.
+
 The SQLite and Postgres stores keep a few searchable columns at the table level and store the full campaign record as JSON. That keeps the schema small while letting the bundle shape evolve without frequent migrations.
 
 ## Design Notes

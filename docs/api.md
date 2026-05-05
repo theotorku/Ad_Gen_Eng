@@ -18,6 +18,11 @@ The served app is FastAPI/Uvicorn. Requests are scoped to an organization with
 the optional `X-Organization-ID` header. When the header is omitted, the API uses
 the local compatibility organization: `default`.
 
+Staging and production can require `X-API-Key` by setting
+`AD_ENGINE_REQUIRE_API_KEY=true`. Keys are configured with
+`AD_ENGINE_API_KEYS=key:organization_id,key2:organization_id2`; an authenticated
+key resolves the request workspace.
+
 ## Endpoints
 
 ### `GET /health`
@@ -30,6 +35,7 @@ Example response:
 {
   "status": "ok",
   "db_backend": "memory",
+  "auth_required": false,
   "providers": {
     "planning_provider": "rule_based",
     "copy_provider": "rule_based",
@@ -140,6 +146,7 @@ The API returns `404 Not Found` when a campaign ID or route does not exist.
 - Campaign persistence depends on the configured store backend.
 - Campaign records include `organization_id`.
 - Send `X-Organization-ID: <workspace-id>` to isolate campaign reads and writes by workspace.
+- Send `X-API-Key: <key>` when `AD_ENGINE_REQUIRE_API_KEY=true`.
 - `POST /bundles` is currently the campaign creation endpoint.
 - `GET /bundles/{id}` and `GET /campaigns/{id}` use the same underlying campaign ID.
 - Generated image files are saved on disk and exposed through `GET /generated-assets/{filename}` when `AD_ENGINE_IMAGE_PROVIDER=openai_images` is active.

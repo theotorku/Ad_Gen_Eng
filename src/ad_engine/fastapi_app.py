@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .api import DEFAULT_CORS_ORIGINS, DEFAULT_ORGANIZATION_ID
 from .assets import get_generated_asset_root
+from .auth import AuthContext, AuthSettings, AuthenticationError, resolve_auth_context
 from .engine import AdGenerationEngine
 from .providers import build_provider_stack
 from .store import CampaignStore, StoreSettings, build_campaign_store
@@ -39,13 +40,14 @@ def create_app(
     app = FastAPI(title="Ad Generation Engine API", version="0.2.0")
     app.state.engine = engine or AdGenerationEngine(build_provider_stack())
     app.state.store = store or build_campaign_store(StoreSettings.from_env())
+    app.state.auth_settings = AuthSettings.from_env()
 
     origins, allow_any = _load_cors_origins()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if allow_any else list(origins),
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Organization-ID"],
+        allow_headers=["Content-Type", "X-Organization-ID", "X-API-Key"],
     )
 
     @app.get("/health")
@@ -54,6 +56,7 @@ def create_app(
             "status": "ok",
             "providers": app.state.engine.providers.describe(),
             "db_backend": app.state.store.backend_name,
+            "auth_required": app.state.auth_settings.require_api_key,
         }
 
     @app.get("/bundles")
@@ -66,14 +69,16 @@ def create_app(
     async def create_bundle(
         request: Request,
         x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
         payload = await _read_json_object(request)
         try:
             bundle = app.state.engine.run(payload)
             stored = app.state.store.create(
                 bundle,
                 metadata=_campaign_metadata_from_brief(payload),
-                organization_id=_organization_id(x_organization_id),
+                organization_id=auth.organization_id,
             )
         except ValueError as exc:
             raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
@@ -84,9 +89,11 @@ def create_app(
     def get_bundle(
         campaign_id: str,
         x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
         stored = app.state.store.get(
-            campaign_id, organization_id=_organization_id(x_organization_id)
+            campaign_id, organization_id=auth.organization_id
         )
         if stored is None:
             raise HTTPException(
@@ -98,11 +105,13 @@ def create_app(
     @app.get("/campaigns")
     def list_campaigns(
         x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
         campaigns = [
             campaign.to_dict()
             for campaign in app.state.store.list(
-                organization_id=_organization_id(x_organization_id)
+                organization_id=auth.organization_id
             )
         ]
         return {"campaigns": campaigns, "count": len(campaigns)}
@@ -111,9 +120,11 @@ def create_app(
     def get_campaign(
         campaign_id: str,
         x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
         stored = app.state.store.get(
-            campaign_id, organization_id=_organization_id(x_organization_id)
+            campaign_id, organization_id=auth.organization_id
         )
         if stored is None:
             raise HTTPException(
@@ -127,11 +138,13 @@ def create_app(
         campaign_id: str,
         payload: CampaignUpdateRequest,
         x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
         try:
             stored = app.state.store.update(
                 campaign_id,
-                organization_id=_organization_id(x_organization_id),
+                organization_id=auth.organization_id,
                 status=payload.status,
                 approval_notes=payload.approval_notes,
                 metadata=payload.metadata,
@@ -151,11 +164,13 @@ def create_app(
         campaign_id: str,
         payload: CampaignApprovalRequest | None = None,
         x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
     ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, x_organization_id)
         stored = app.state.store.approve(
             campaign_id,
             approval_notes=payload.approval_notes if payload else None,
-            organization_id=_organization_id(x_organization_id),
+            organization_id=auth.organization_id,
         )
         if stored is None:
             raise HTTPException(
@@ -165,7 +180,12 @@ def create_app(
         return stored.to_dict()
 
     @app.get("/generated-assets/{filename:path}")
-    def generated_asset(filename: str) -> FileResponse:
+    def generated_asset(
+        filename: str,
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+    ) -> FileResponse:
+        _auth_context(app, x_api_key, x_organization_id)
         asset_root = get_generated_asset_root().resolve()
         asset_path = (asset_root / filename.strip()).resolve()
         if asset_root not in asset_path.parents and asset_path != asset_root:
@@ -213,6 +233,21 @@ def _campaign_metadata_from_brief(payload: dict[str, Any]) -> dict[str, Any]:
 def _organization_id(value: str | None) -> str:
     normalized = (value or DEFAULT_ORGANIZATION_ID).strip()
     return normalized or DEFAULT_ORGANIZATION_ID
+
+
+def _auth_context(
+    app: FastAPI,
+    api_key: str | None,
+    organization_id: str | None,
+) -> AuthContext:
+    try:
+        return resolve_auth_context(
+            settings=app.state.auth_settings,
+            api_key=api_key,
+            requested_organization_id=organization_id,
+        )
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail=str(exc)) from exc
 
 
 def _load_cors_origins() -> tuple[frozenset[str], bool]:
