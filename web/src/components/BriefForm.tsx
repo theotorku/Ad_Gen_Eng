@@ -159,8 +159,14 @@ function BriefForm({
         </label>
 
         <div>
-          <span className="field-label">Channels</span>
-          <div className="segmented-control">
+          <span className="field-label" id="channels-label">
+            Channels
+          </span>
+          <div
+            className="segmented-control"
+            role="group"
+            aria-labelledby="channels-label"
+          >
             {CHANNEL_OPTIONS.map((channel) => {
               const selected = formState.channels.includes(channel.value);
               return (
@@ -169,6 +175,7 @@ function BriefForm({
                   type="button"
                   className={selected ? "segment active" : "segment"}
                   onClick={() => onChannelToggle(channel.value)}
+                  aria-pressed={selected}
                 >
                   {channel.label}
                 </button>

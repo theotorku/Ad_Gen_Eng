@@ -44,14 +44,24 @@ describe("BriefForm", () => {
     expect(props.onChannelToggle).toHaveBeenCalledWith("instagram");
   });
 
-  it("marks selected channels with the active class", () => {
+  it("marks selected channels with the active class and aria-pressed", () => {
     renderForm();
 
     const linkedin = screen.getByRole("button", { name: "LinkedIn" });
     const instagram = screen.getByRole("button", { name: "Instagram" });
 
     expect(linkedin).toHaveClass("active");
+    expect(linkedin).toHaveAttribute("aria-pressed", "true");
     expect(instagram).not.toHaveClass("active");
+    expect(instagram).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("groups channel segments with an accessible label", () => {
+    renderForm();
+
+    const group = screen.getByRole("group", { name: /channels/i });
+    expect(group).toBeInTheDocument();
+    expect(group).toContainElement(screen.getByRole("button", { name: "LinkedIn" }));
   });
 
   it("calls onSubmit when the generate button is clicked", async () => {
