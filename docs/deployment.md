@@ -36,10 +36,11 @@ Output directory:
 dist
 ```
 
-Required environment variable:
+Required environment variables:
 
 ```text
 VITE_API_BASE_URL
+VITE_API_KEY
 ```
 
 Optional workspace selector:
@@ -48,7 +49,7 @@ Optional workspace selector:
 VITE_ORGANIZATION_ID
 ```
 
-The frontend should be deployed as a static site and pointed at the backend URL for the same environment.
+`VITE_*` variables are inlined into the static bundle at build time, so any change requires a fresh build and redeploy. The frontend should be deployed as a static site and pointed at the backend URL for the same environment.
 
 ### Backend
 
@@ -245,10 +246,11 @@ npm run build
 Recommended smoke checks:
 
 - `GET /health` returns `status: ok`
-- dashboard loads successfully
+- dashboard loads successfully (including `/favicon.ico`)
 - create campaign works
+- generate image works and the variant card renders the image (blob URL)
 - save notes works
-- approve campaign works
+- approve campaign works and the action button disables
 
 ## Rollout Plan
 
@@ -269,15 +271,24 @@ The repo ships with concrete config for this stack:
 - `Dockerfile` and `.dockerignore`: backend image
 - `railway.json`: Railway build, healthcheck, single-instance deploy
 - `vercel.json`: Vite framework preset for the dashboard
+- `public/favicon.ico`: static asset shipped to the Vercel build output
+
+Live Phase 1 environment:
+
+- backend: `https://ad-generation-engine-production.up.railway.app`
+- frontend: `https://ad-gen-eng-kfso.vercel.app`
 
 Backend (Railway):
 
 1. Create a new Railway project from this GitHub repo. Railway picks up `railway.json` and uses the Dockerfile.
-2. Attach a volume mounted at `/app/data`. SQLite and generated assets live here.
+2. Attach a volume mounted at `/app/data`. SQLite and generated assets live here. The Dockerfile entrypoint `chown`s `/app/data` to the non-root `app` user on every boot so the volume is writable on first attach.
 3. Set service variables:
-   - `AD_ENGINE_CORS_ORIGINS` = the Vercel frontend URL
+   - `AD_ENGINE_CORS_ORIGINS` = the Vercel frontend URL (no trailing slash, no wildcards once the frontend domain is known)
    - `AD_ENGINE_REQUIRE_API_KEY` = `true`
-   - `AD_ENGINE_API_KEYS` = `<random-key>:default`
+   - `AD_ENGINE_API_KEYS` = `<random-key>:default` (the `:default` suffix scopes the key to the `default` organization)
+   - `AD_ENGINE_DB_PATH` = `/app/data/ad_engine.db`
+   - `AD_ENGINE_ASSET_DIR` = `/app/data/generated_assets`
+   - `AD_ENGINE_IMAGE_PROVIDER` = `openai_images` (optional)
    - `OPENAI_API_KEY` only if `AD_ENGINE_IMAGE_PROVIDER=openai_images`
 4. Generate a public domain for the service. Note the URL.
 5. Deploy. The `/health` endpoint must return 200 before Railway routes traffic.
@@ -287,15 +298,29 @@ Frontend (Vercel):
 1. Import the same GitHub repo. Vercel reads `vercel.json` and uses the Vite preset.
 2. Set project environment variables:
    - `VITE_API_BASE_URL` = the Railway service URL from above
-   - `VITE_API_KEY` = the matching key from `AD_ENGINE_API_KEYS`
+   - `VITE_API_KEY` = **only the raw key, without the `:default` org suffix.** This is the value the dashboard sends in the `X-API-Key` header; the backend looks the org up from the key.
    - `VITE_ORGANIZATION_ID` = `default`
-3. Deploy. Vite inlines `VITE_*` vars at build time, so changing them requires a redeploy.
+3. Deploy. Vite inlines `VITE_*` vars at build time, so changing them requires a redeploy without build cache.
+
+Authenticated assets:
+
+- `GET /generated-assets/{filename}` requires the `X-API-Key` header. Browsers will not attach custom headers to `<img src=...>` requests, so a plain `<img>` against this endpoint returns 401 and is then blocked by Chrome's Opaque Response Blocking (`ERR_BLOCKED_BY_ORB`).
+- The dashboard works around this in `web/src/components/VariantCard.tsx`: it calls `fetchAssetBlobUrl` from `web/src/api.ts`, which `fetch`es the asset with the auth header, wraps the response in `URL.createObjectURL`, and revokes the object URL on unmount. Any future surface that displays generated images must use the same pattern unless `/generated-assets` is moved behind signed URLs or object storage.
+
+Phase 1 smoke test (run after each redeploy):
+
+1. `GET https://<backend>/health` returns `status: ok`.
+2. From the deployed frontend, submit a brief and confirm 9 variants are returned.
+3. Click "Generate image" on a variant. The card should switch from `prompt only` to `generated` and the image should render (blob URL, not 401).
+4. Approve the campaign. The primary action should relabel to `Approved` and disable.
+5. Refresh the page. The campaign, variants, and image should all persist (volume-backed SQLite + asset directory).
 
 Phase 1 constraints (accept these or move to Phase 2):
 
 - one backend replica only (SQLite cannot serve multiple instances)
 - generated assets live on the Railway volume, not object storage
 - a volume detach or service rebuild without volume reattachment loses data
+- API keys are baked into the Vite bundle at build time; rotating `AD_ENGINE_API_KEYS` requires updating `VITE_API_KEY` and redeploying the frontend
 
 ### Phase 2: Shared Internal Environment
 
