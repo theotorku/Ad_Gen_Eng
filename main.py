@@ -64,12 +64,31 @@ def load_brief_from_args() -> dict:
         return json.load(handle)
 
 
+def resolve_serve_address(argv: list[str]) -> tuple[str, int]:
+    env_host = os.environ.get("HOST")
+    env_port = os.environ.get("PORT")
+
+    if len(argv) >= 4:
+        return argv[2], int(argv[3])
+
+    port = int(env_port) if env_port else DEFAULT_PORT
+    if len(argv) >= 3:
+        return argv[2], port
+
+    if env_host:
+        host = env_host
+    elif env_port:
+        host = "0.0.0.0"
+    else:
+        host = DEFAULT_HOST
+    return host, port
+
+
 def main() -> None:
     load_dotenv()
 
     if len(sys.argv) >= 2 and sys.argv[1] == "serve":
-        host = sys.argv[2] if len(sys.argv) >= 3 else DEFAULT_HOST
-        port = int(sys.argv[3]) if len(sys.argv) >= 4 else DEFAULT_PORT
+        host, port = resolve_serve_address(sys.argv)
         run_api_server(host=host, port=port)
         return
 
