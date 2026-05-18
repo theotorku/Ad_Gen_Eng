@@ -1,0 +1,46 @@
+.git
+.github
+.gitignore
+.gitattributes
+
+# Frontend (built separately and deployed to Vercel)
+web
+node_modules
+dist
+package.json
+package-lock.json
+tsconfig*.json
+vite.config*
+vitest.config.ts
+index.html
+
+# Tests, dev tooling, and dev-only deps
+tests
+requirements-dev.txt
+pyproject.toml
+
+# Local data and logs (volumes provide these at runtime)
+data
+output
+*.log
+*.err.log
+
+# Docs and screenshots
+docs
+system_overview
+*.md
+*.png
+*.jpg
+*.jpeg
+
+# Editor and OS noise
+.vscode
+.idea
+.DS_Store
+__pycache__
+*.pyc
+
+# Env files (set in the platform dashboard, never baked into the image)
+.env
+.env.*
+!.env.example
