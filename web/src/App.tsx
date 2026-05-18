@@ -266,7 +266,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell" data-theme={theme}>
+    <div className="app-shell">
       <BriefForm
         formState={formState}
         isPending={isCreating}
