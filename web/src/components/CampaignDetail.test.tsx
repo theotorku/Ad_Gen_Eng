@@ -124,13 +124,14 @@ describe("CampaignDetail", () => {
     expect(screen.getByText("Pending")).toBeInTheDocument();
   });
 
-  it("disables and relabels the approve button once the campaign is approved", () => {
+  it("hides the approve button once the campaign is approved", () => {
     renderDetail({
       campaign: buildCampaign({ status: "approved", approved_at: "2025-01-15T11:30:00Z" }),
     });
 
-    const approvedButton = screen.getByRole("button", { name: /approved/i });
-    expect(approvedButton).toBeDisabled();
-    expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^approve(d)?$/i })).not.toBeInTheDocument();
+    const badge = document.querySelector(".status-badge.approved");
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveTextContent(/approved/i);
   });
 });

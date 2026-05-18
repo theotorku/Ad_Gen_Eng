@@ -58,7 +58,14 @@ function CampaignDetail({
         </div>
         <div className="detail-actions">
           <span className={campaign.status === "approved" ? "status-badge approved" : "status-badge"}>
-            {campaign.status}
+            {campaign.status === "approved" ? (
+              <>
+                <CheckCircle2 size={12} />
+                Approved
+              </>
+            ) : (
+              campaign.status
+            )}
           </span>
           <button className="ghost-action" type="button" onClick={onSaveNotes} disabled={isSaving}>
             {isSaving ? "Saving" : "Save notes"}
@@ -67,15 +74,17 @@ function CampaignDetail({
             <Download size={14} />
             {isExporting ? "Exporting" : "Export"}
           </button>
-          <button
-            className="primary-inline"
-            type="button"
-            onClick={onApprove}
-            disabled={isApproving || campaign.status === "approved"}
-          >
-            <CheckCircle2 size={14} />
-            {isApproving ? "Approving" : campaign.status === "approved" ? "Approved" : "Approve"}
-          </button>
+          {campaign.status !== "approved" ? (
+            <button
+              className="primary-inline"
+              type="button"
+              onClick={onApprove}
+              disabled={isApproving}
+            >
+              <CheckCircle2 size={14} />
+              {isApproving ? "Approving" : "Approve"}
+            </button>
+          ) : null}
         </div>
       </div>
 
