@@ -319,7 +319,7 @@ textarea {
 }
 
 input::placeholder, textarea::placeholder {
-  color: var(--ink-300);
+  color: var(--ink-500);
   font-style: italic;
 }
 
@@ -332,6 +332,27 @@ input:focus, textarea:focus {
 }
 
 input:focus { border-bottom-width: 2px; padding-bottom: 8px; }
+
+input:focus-visible,
+textarea:focus-visible {
+  border-color: var(--vermilion);
+  box-shadow: 0 0 0 2px var(--vermilion-edge);
+}
+
+.ghost-action:focus-visible,
+.primary-action:focus-visible,
+.primary-inline:focus-visible,
+.campaign-row:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: 2px;
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--vermilion);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
+}
 
 .field-grid {
   display: grid;
