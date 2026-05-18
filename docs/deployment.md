@@ -262,6 +262,41 @@ Use:
 
 This is the fastest way to get a shareable MVP online.
 
+#### Phase 1 Runbook (Railway + Vercel)
+
+The repo ships with concrete config for this stack:
+
+- `Dockerfile` and `.dockerignore`: backend image
+- `railway.json`: Railway build, healthcheck, single-instance deploy
+- `vercel.json`: Vite framework preset for the dashboard
+
+Backend (Railway):
+
+1. Create a new Railway project from this GitHub repo. Railway picks up `railway.json` and uses the Dockerfile.
+2. Attach a volume mounted at `/app/data`. SQLite and generated assets live here.
+3. Set service variables:
+   - `AD_ENGINE_CORS_ORIGINS` = the Vercel frontend URL
+   - `AD_ENGINE_REQUIRE_API_KEY` = `true`
+   - `AD_ENGINE_API_KEYS` = `<random-key>:default`
+   - `OPENAI_API_KEY` only if `AD_ENGINE_IMAGE_PROVIDER=openai_images`
+4. Generate a public domain for the service. Note the URL.
+5. Deploy. The `/health` endpoint must return 200 before Railway routes traffic.
+
+Frontend (Vercel):
+
+1. Import the same GitHub repo. Vercel reads `vercel.json` and uses the Vite preset.
+2. Set project environment variables:
+   - `VITE_API_BASE_URL` = the Railway service URL from above
+   - `VITE_API_KEY` = the matching key from `AD_ENGINE_API_KEYS`
+   - `VITE_ORGANIZATION_ID` = `default`
+3. Deploy. Vite inlines `VITE_*` vars at build time, so changing them requires a redeploy.
+
+Phase 1 constraints (accept these or move to Phase 2):
+
+- one backend replica only (SQLite cannot serve multiple instances)
+- generated assets live on the Railway volume, not object storage
+- a volume detach or service rebuild without volume reattachment loses data
+
 ### Phase 2: Shared Internal Environment
 
 Add:
@@ -298,7 +333,7 @@ That stack is enough for a practical MVP without heavy operations work.
 
 ## Repo-Specific Notes
 
-- `main.py serve` defaults to `127.0.0.1:8000`, but deployed environments should set explicit host and port behavior through the platform runtime.
+- `main.py serve` defaults to `127.0.0.1:8000` for local dev. When `PORT` is set in the environment (Railway, Render, Fly), the server binds to `0.0.0.0` automatically. `HOST` can override the bind address explicitly.
 - The frontend can be served on any Vite or static-host port as long as `VITE_API_BASE_URL` points to the matching backend.
 - If a local or shared machine already uses `8000` or `5173`, use alternate ports and keep the frontend/backend pair aligned.
 
