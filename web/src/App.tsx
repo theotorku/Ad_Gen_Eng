@@ -285,8 +285,12 @@ function App() {
             <h2>Today&rsquo;s desk</h2>
           </div>
           <div className="header-actions">
-            <div className="status-chip">
-              {isWorking ? <LoaderCircle className="spin" size={12} /> : <RefreshCw size={12} />}
+            <div className="status-chip" role="status" aria-live="polite">
+              {isWorking ? (
+                <LoaderCircle className="spin" size={12} aria-hidden="true" />
+              ) : (
+                <RefreshCw size={12} aria-hidden="true" />
+              )}
               <span>{statusMessage}</span>
             </div>
             <button
@@ -294,8 +298,13 @@ function App() {
               type="button"
               onClick={toggleTheme}
               aria-pressed={isDarkMode}
+              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {isDarkMode ? <Sun size={14} /> : <Moon size={14} />}
+              {isDarkMode ? (
+                <Sun size={14} aria-hidden="true" />
+              ) : (
+                <Moon size={14} aria-hidden="true" />
+              )}
               {isDarkMode ? "Light mode" : "Dark mode"}
             </button>
             <button className="ghost-action" type="button" onClick={() => void loadCampaigns()}>
@@ -304,7 +313,11 @@ function App() {
           </div>
         </header>
 
-        {errorMessage ? <p className="error-banner">{errorMessage}</p> : null}
+        {errorMessage ? (
+          <p className="error-banner" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
 
         <section className="workspace-grid">
           <CampaignList
