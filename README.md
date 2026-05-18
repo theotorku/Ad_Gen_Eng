@@ -174,9 +174,13 @@ Use `AD_ENGINE_IMAGE_PROVIDER=prompt_template` when you want local prompt genera
 
 The React dashboard is a lightweight SaaS MVP shell with:
 
-- campaign creation form
+- campaign creation form with `Load sample brief` and `Clear` shortcuts
 - campaign list view
 - campaign detail, copy editing, export, and approval workspace
+- `Reuse brief` action that copies a selected campaign's brief back into the form
+- variant editor with `Cancel` to discard an in-progress edit
+- image regeneration guarded by a confirmation prompt and a per-card session counter
+- light/dark theme toggle persisted in `localStorage` and applied before first paint
 
 Set a custom API base URL when needed:
 
@@ -230,6 +234,16 @@ $env:VITE_ORGANIZATION_ID = 'workspace-a'
 
 ## Good next steps
 
-1. Add campaign filtering, deletion, and audit history.
-2. Add concrete remote LLM and image provider implementations behind the new provider interfaces.
-3. Store real generated image assets and references alongside campaign bundles.
+Dashboard polish that has already shipped in v1.1:
+
+- variant image clipping fix, global theme persistence, consolidated approval indicator, decoupled new-brief form
+- form contrast, focus rings, ARIA roles on segmented controls, semantic landmarks, live regions for status and errors
+- cancel-in-progress variant edits, image regeneration cost surface + confirm guard, `Reuse brief` action
+
+Deferred to a later version:
+
+1. **Prompt / output quality (v1.2 — Bucket D).** Bake per-channel character-length constraints into the generation prompt, diversify hooks across the 9 variants, and diversify image prompts so they read as distinct concepts rather than restyled siblings.
+2. **Layout and preview UX (v1.2 — Bucket E).** Two-column brief layout at ≥1024px, native channel preview dimensions per variant (1:1 for Instagram, 1.91:1 for Facebook, etc.), a proper first-run/empty state, and loading skeletons for streaming variants.
+3. **Workflow depth.** Campaign filtering, deletion, and audit history.
+4. **Provider depth.** Concrete remote LLM and image provider implementations behind the existing provider interfaces.
+5. **Asset lifecycle.** Store real generated image assets and references alongside campaign bundles, with retention controls.

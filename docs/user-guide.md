@@ -80,6 +80,8 @@ You will fill in:
 - constraints
 - channels
 
+The form starts blank on each session so a selected campaign on the right never overwrites what you are typing. Use `Load sample brief` to drop in the demo payload or `Clear` to reset the form to empty.
+
 ### Campaign List
 
 This shows the campaigns you have already created.
@@ -99,11 +101,13 @@ You can:
 - read the strategy summary
 - inspect generated ad variants
 - edit headlines, primary text, CTAs, and image prompts
+- cancel an in-progress edit without saving
 - generate or retry one image at a time
 - export the campaign as a text bundle
 - review the image prompts
 - add approval notes
 - approve the campaign
+- reuse this campaign's brief as a starting point for a new generation
 
 ## How To Create a Campaign
 
@@ -158,7 +162,7 @@ If a variant is close but needs final polish, use `Edit` on that variant. If the
 1. Open a campaign.
 2. Select `Edit` on a generated variant.
 3. Update the headline, primary text, CTA, or image prompt.
-4. Select `Save`.
+4. Select `Save` to commit, or `Cancel` to discard the in-progress edit and keep the original copy.
 
 The campaign keeps the edited variant and updates the campaign timestamp.
 
@@ -169,7 +173,22 @@ The campaign keeps the edited variant and updates the campaign timestamp.
 3. Select `Generate image` on that variant.
 4. If generation fails, review the message and select `Retry image`.
 
-Generate images only for variants you actually plan to use. This keeps cost and wait time under control.
+Generate images only for variants you actually plan to use. This keeps cost and wait time under control. Each image call uses one OpenAI image credit, and the variant card displays a cost hint and a session regeneration counter so you can see how often a given variant has been redone. Regenerating a variant that already has an image asks for confirmation before replacing it.
+
+## How To Reuse A Brief
+
+If you want to iterate on an existing campaign rather than retyping its inputs:
+
+1. Open the campaign you want to start from.
+2. Select `Reuse brief` in the detail header.
+3. The form on the left fills with the campaign's brief, ready for edits.
+4. Adjust the brief and select `Generate campaign` to create a new campaign from it.
+
+The original campaign is untouched. Reusing a brief never overwrites stored data.
+
+## Light And Dark Mode
+
+The dashboard supports a light and a dark theme. Select the theme toggle in the workspace header to switch. Your choice is stored in the browser and applied before the page renders, so reloading does not cause a flash of the wrong theme.
 
 ## How To Export a Campaign
 
@@ -242,7 +261,11 @@ The frontend is usually pointing at the wrong backend URL or port. Make sure:
 
 ### Can I edit generated copy directly in the app?
 
-Yes. Open a campaign, select `Edit` on a variant, and save the revised copy.
+Yes. Open a campaign, select `Edit` on a variant, and save the revised copy. Select `Cancel` to discard the edit and keep the original.
+
+### Can I start a new campaign from an existing one?
+
+Yes. Open the campaign you want to start from and select `Reuse brief`. The form fills with that campaign's brief so you can adjust it and generate a new campaign.
 
 ## Current Limits
 
@@ -253,3 +276,4 @@ This is still an MVP. Right now:
 - export is plain text only
 - image asset creation is per variant and requires `AD_ENGINE_IMAGE_PROVIDER=openai_images` plus a valid `OPENAI_API_KEY`
 - approval is simple and does not include multi-person workflow
+- per-channel character limits and channel-native preview sizes are not yet enforced in the generated copy or layout

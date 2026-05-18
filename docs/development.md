@@ -98,20 +98,36 @@ By default, `openai_images` attaches prompts during campaign creation and genera
 
 ## Testing Strategy
 
-Current verification is lightweight and manual:
+Current verification:
 
 - `compileall` for syntax sanity
 - CLI execution for pipeline verification
 - local API calls for route verification
-- browser-based flow verification for create, save notes, and approve
 - FastAPI route tests for organization-scoped campaign access
+- Vitest + Testing Library coverage on the dashboard (`npm run test:run`) for the brief form, campaign detail, variant card, and high-level App flows
+- `tsc --noEmit` typecheck on the dashboard (`npm run typecheck`)
 
 Good next testing additions:
 
 - unit tests for `CampaignBrief` validation
 - provider-level tests for deterministic outputs
 - Postgres integration tests against a disposable database
-- frontend interaction tests for creation, selection, and approval flows
+- end-to-end coverage of the dashboard against a running API (Playwright is already a dev dependency)
+
+## Roadmap
+
+Shipped in v1.1 (dashboard polish pass):
+
+- variant image rendering fix, global theme persistence, consolidated approval indicator, decoupled new-brief form
+- form contrast, focus rings, ARIA roles on segmented controls, semantic landmarks, live regions for status and errors
+- variant edit Cancel, image regeneration cost surface + confirm guard, `Reuse brief` action
+
+Deferred to v1.2:
+
+- per-channel character-length constraints baked into the generation prompt
+- diversified hooks and image prompts across the 9-variant set
+- two-column brief layout at ≥1024px, channel-native preview dimensions per variant
+- proper first-run/empty state and loading skeletons for streaming variants
 
 ## Documentation Map
 
