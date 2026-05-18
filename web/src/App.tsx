@@ -11,7 +11,7 @@ import {
   updateCampaignVariant,
 } from "./api";
 import type { AdVariant, CampaignBrief, CampaignRecord } from "./types";
-import { SAMPLE_FORM } from "./constants";
+import { EMPTY_FORM, SAMPLE_FORM } from "./constants";
 import BriefForm from "./components/BriefForm";
 import CampaignList from "./components/CampaignList";
 import CampaignDetail from "./components/CampaignDetail";
@@ -31,7 +31,7 @@ function getInitialTheme(): ThemeMode {
 function App() {
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
-  const [formState, setFormState] = useState<CampaignBrief>(SAMPLE_FORM);
+  const [formState, setFormState] = useState<CampaignBrief>(EMPTY_FORM);
   const [approvalNotes, setApprovalNotes] = useState("");
   const [statusMessage, setStatusMessage] = useState("Loading campaigns");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -274,6 +274,8 @@ function App() {
         onListFieldChange={handleListFieldChange}
         onChannelToggle={handleChannelToggle}
         onSubmit={handleCreateCampaign}
+        onLoadSample={() => setFormState(SAMPLE_FORM)}
+        onReset={() => setFormState(EMPTY_FORM)}
       />
 
       <main className="workspace">

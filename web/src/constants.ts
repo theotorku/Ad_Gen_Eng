@@ -19,3 +19,16 @@ export const SAMPLE_FORM: CampaignBrief = {
   channels: ["linkedin", "facebook", "google_search"],
   constraints: ["Avoid exaggerated performance claims"],
 };
+
+export const EMPTY_FORM: CampaignBrief = {
+  brand_name: "",
+  product_name: "",
+  objective: "",
+  target_audience: "",
+  pain_points: [],
+  value_props: [],
+  offer: "",
+  tone: "",
+  channels: [],
+  constraints: [],
+};

@@ -1,4 +1,4 @@
-import { Send } from "lucide-react";
+import { RotateCcw, Send, Sparkles } from "lucide-react";
 import type { CampaignBrief } from "../types";
 import { CHANNEL_OPTIONS } from "../constants";
 
@@ -11,6 +11,8 @@ type BriefFormProps = {
   onListFieldChange: (field: ListField, value: string) => void;
   onChannelToggle: (channel: string) => void;
   onSubmit: () => void;
+  onLoadSample?: () => void;
+  onReset?: () => void;
 };
 
 function BriefForm({
@@ -20,6 +22,8 @@ function BriefForm({
   onListFieldChange,
   onChannelToggle,
   onSubmit,
+  onLoadSample,
+  onReset,
 }: BriefFormProps) {
   return (
     <aside className="left-rail">
@@ -45,6 +49,36 @@ function BriefForm({
           <span className="num">01 /</span>
           <h2>New brief</h2>
         </div>
+        <p className="form-hint">
+          Draft a fresh brief here. Selecting a campaign on the right is for review and
+          does not load its brief back into this form.
+        </p>
+        {(onLoadSample || onReset) && (
+          <div className="form-quickstart">
+            {onLoadSample ? (
+              <button
+                className="ghost-action"
+                type="button"
+                onClick={onLoadSample}
+                disabled={isPending}
+              >
+                <Sparkles size={12} />
+                Load sample brief
+              </button>
+            ) : null}
+            {onReset ? (
+              <button
+                className="ghost-action"
+                type="button"
+                onClick={onReset}
+                disabled={isPending}
+              >
+                <RotateCcw size={12} />
+                Clear
+              </button>
+            ) : null}
+          </div>
+        )}
 
         <label>
           <span>Brand</span>

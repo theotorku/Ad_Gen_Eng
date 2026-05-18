@@ -67,4 +67,29 @@ describe("BriefForm", () => {
 
     expect(screen.getByRole("button", { name: /generate campaign/i })).toBeDisabled();
   });
+
+  it("calls onLoadSample when the Load sample brief button is clicked", async () => {
+    const onLoadSample = vi.fn();
+    renderForm({ onLoadSample });
+
+    await userEvent.click(screen.getByRole("button", { name: /load sample brief/i }));
+
+    expect(onLoadSample).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onReset when the Clear button is clicked", async () => {
+    const onReset = vi.fn();
+    renderForm({ onReset });
+
+    await userEvent.click(screen.getByRole("button", { name: /^clear$/i }));
+
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the quickstart controls when no handlers are provided", () => {
+    renderForm();
+
+    expect(screen.queryByRole("button", { name: /load sample brief/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^clear$/i })).not.toBeInTheDocument();
+  });
 });

@@ -261,6 +261,21 @@ button { cursor: pointer; }
 
 .form-section { display: flex; flex-direction: column; gap: 18px; }
 
+.form-hint {
+  margin: -8px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-500);
+  line-height: 1.55;
+}
+
+.form-quickstart {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 label, .field-label {
   display: flex;
   flex-direction: column;
