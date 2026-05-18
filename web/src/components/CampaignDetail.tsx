@@ -67,9 +67,14 @@ function CampaignDetail({
             <Download size={14} />
             {isExporting ? "Exporting" : "Export"}
           </button>
-          <button className="primary-inline" type="button" onClick={onApprove} disabled={isApproving}>
+          <button
+            className="primary-inline"
+            type="button"
+            onClick={onApprove}
+            disabled={isApproving || campaign.status === "approved"}
+          >
             <CheckCircle2 size={14} />
-            {isApproving ? "Approving" : "Approve"}
+            {isApproving ? "Approving" : campaign.status === "approved" ? "Approved" : "Approve"}
           </button>
         </div>
       </div>
