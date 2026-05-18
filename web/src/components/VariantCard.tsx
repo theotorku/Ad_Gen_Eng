@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Edit3, ImageIcon, RefreshCw, Save } from "lucide-react";
 import type { AdVariant } from "../types";
-import { apiBaseUrl, formatChannel } from "../utils";
+import { fetchAssetBlobUrl } from "../api";
+import { formatChannel } from "../utils";
 
 type VariantCardProps = {
   variant: AdVariant;
@@ -24,12 +25,39 @@ function VariantCard({
   onGenerateImage,
 }: VariantCardProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [draft, setDraft] = useState({
     headline: variant.headline,
     primary_text: variant.primary_text,
     cta: variant.cta,
     image_prompt: variant.image_prompt,
   });
+
+  const assetPath = variant.generated_asset?.path ?? null;
+  useEffect(() => {
+    if (!assetPath) {
+      setImageUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let createdUrl: string | null = null;
+    fetchAssetBlobUrl(assetPath)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        createdUrl = url;
+        setImageUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setImageUrl(null);
+      });
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [assetPath]);
 
   function handleEdit() {
     setDraft({
@@ -118,10 +146,10 @@ function VariantCard({
       ) : (
         <>
           <h5>{variant.headline}</h5>
-          {variant.generated_asset ? (
+          {variant.generated_asset && imageUrl ? (
             <img
               className="variant-image"
-              src={`${apiBaseUrl()}${variant.generated_asset.path}`}
+              src={imageUrl}
               alt={variant.headline}
             />
           ) : null}

@@ -111,3 +111,14 @@ export async function generateVariantImage(
 export async function exportCampaignText(campaignId: string): Promise<string> {
   return requestText(`/campaigns/${campaignId}/export.txt`);
 }
+
+export async function fetchAssetBlobUrl(path: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: buildHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(`Asset fetch failed with status ${response.status}`);
+  }
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}

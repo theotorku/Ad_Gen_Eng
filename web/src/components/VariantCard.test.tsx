@@ -1,10 +1,30 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import VariantCard from "./VariantCard";
 import { sampleVariant } from "../test-fixtures";
 
+function fakeImageResponse(): Response {
+  return {
+    ok: true,
+    status: 200,
+    blob: async () => new Blob(["image-bytes"], { type: "image/png" }),
+  } as unknown as Response;
+}
+
 describe("VariantCard", () => {
+  beforeEach(() => {
+    let counter = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => fakeImageResponse()));
+    vi.spyOn(URL, "createObjectURL").mockImplementation(() => `blob:mock-url-${++counter}`);
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it("renders headline, primary text, cta, and image prompt", () => {
     render(<VariantCard variant={sampleVariant} />);
 
@@ -26,11 +46,11 @@ describe("VariantCard", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it("renders the image when generated_asset is present", () => {
+  it("renders the image as an authenticated blob when generated_asset is present", async () => {
     const variant = {
       ...sampleVariant,
       generated_asset: {
-        path: "/assets/foo.png",
+        path: "/generated-assets/foo.png",
         mime_type: "image/png",
         provider: "openai_images",
         prompt: "p",
@@ -40,9 +60,45 @@ describe("VariantCard", () => {
 
     render(<VariantCard variant={variant} />);
 
-    const img = screen.getByRole("img") as HTMLImageElement;
-    expect(img.src).toContain("/assets/foo.png");
+    const img = (await screen.findByRole("img")) as HTMLImageElement;
+    expect(img.src).toBe("blob:mock-url-1");
     expect(img.alt).toBe("Ship campaigns in hours, not weeks");
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/generated-assets/foo.png"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ "X-Organization-ID": "default" }),
+      }),
+    );
+  });
+
+  it("does not render an image while the blob fetch is in flight", async () => {
+    const variant = {
+      ...sampleVariant,
+      generated_asset: {
+        path: "/generated-assets/bar.png",
+        mime_type: "image/png",
+        provider: "openai_images",
+        prompt: "p",
+        revised_prompt: null,
+      },
+    };
+
+    let resolveFetch: (response: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          }),
+      ),
+    );
+
+    render(<VariantCard variant={variant} />);
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+
+    resolveFetch(fakeImageResponse());
+    await waitFor(() => expect(screen.getByRole("img")).toBeInTheDocument());
   });
 
   it("edits and saves variant copy", async () => {
