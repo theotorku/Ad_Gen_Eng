@@ -10,18 +10,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py sample_brief.json ./
 COPY src ./src
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
-RUN mkdir -p /app/data/generated_assets \
-    && useradd --create-home --uid 1000 appuser \
-    && chown -R appuser:appuser /app
-
-USER appuser
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /app/data/generated_assets \
+    && chown -R appuser:appuser /app \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 8000
 
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["python", "main.py", "serve"]
