@@ -849,6 +849,23 @@ textarea:focus-visible {
   flex-wrap: wrap;
 }
 
+.image-cost-hint {
+  margin: 6px 18px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-500);
+}
+
+.image-cost-hint .regen-count {
+  color: var(--vermilion-deep);
+  font-weight: 500;
+}
+
 .variant-editor {
   display: flex;
   flex-direction: column;

@@ -26,6 +26,7 @@ function VariantCard({
 }: VariantCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [regenerationCount, setRegenerationCount] = useState(0);
   const [draft, setDraft] = useState({
     headline: variant.headline,
     primary_text: variant.primary_text,
@@ -87,6 +88,19 @@ function VariantCard({
   const imageStatus = isGeneratingImage ? "generating" : variant.image_status ?? (variant.generated_asset ? "generated" : "prompt_only");
   const imageButtonLabel =
     imageStatus === "failed" ? "Retry image" : variant.generated_asset ? "Regenerate image" : "Generate image";
+  const hasExistingAsset = Boolean(variant.generated_asset) && imageStatus !== "failed";
+
+  function handleGenerateImageClick() {
+    if (!onGenerateImage) return;
+    if (hasExistingAsset) {
+      const confirmed = window.confirm(
+        "Regenerate this image? This will use another OpenAI image credit and replace the current asset.",
+      );
+      if (!confirmed) return;
+    }
+    setRegenerationCount((current) => (hasExistingAsset ? current + 1 : current));
+    onGenerateImage(index);
+  }
 
   return (
     <article className="variant-item">
@@ -98,7 +112,7 @@ function VariantCard({
         <button
           className="ghost-action"
           type="button"
-          onClick={() => onGenerateImage?.(index)}
+          onClick={handleGenerateImageClick}
           disabled={!onGenerateImage || isGeneratingImage}
         >
           {imageStatus === "failed" ? <RefreshCw size={13} /> : <ImageIcon size={13} />}
@@ -127,6 +141,14 @@ function VariantCard({
           </button>
         )}
       </div>
+      {onGenerateImage && !isEditing ? (
+        <p className="image-cost-hint">
+          <span>Each image generation uses 1 OpenAI image credit.</span>
+          {regenerationCount > 0 ? (
+            <span className="regen-count">Regenerated {regenerationCount}× this session</span>
+          ) : null}
+        </p>
+      ) : null}
       {isEditing ? (
         <div className="variant-editor">
           <label>

@@ -139,6 +139,41 @@ describe("VariantCard", () => {
     expect(onGenerateImage).toHaveBeenCalledWith(3);
   });
 
+  it("confirms before regenerating an existing image and surfaces a regen count", async () => {
+    const onGenerateImage = vi.fn();
+    const variant = {
+      ...sampleVariant,
+      generated_asset: {
+        path: "/generated-assets/foo.png",
+        mime_type: "image/png",
+        provider: "openai_images",
+        prompt: "p",
+        revised_prompt: null,
+      },
+    };
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    render(<VariantCard variant={variant} index={4} onGenerateImage={onGenerateImage} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /regenerate image/i }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(onGenerateImage).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Regenerated/)).not.toBeInTheDocument();
+
+    confirmSpy.mockReturnValue(true);
+    await userEvent.click(screen.getByRole("button", { name: /regenerate image/i }));
+    expect(onGenerateImage).toHaveBeenCalledWith(4);
+    expect(screen.getByText(/Regenerated 1× this session/)).toBeInTheDocument();
+  });
+
+  it("shows the image cost hint when generation is enabled", () => {
+    render(<VariantCard variant={sampleVariant} onGenerateImage={vi.fn()} />);
+
+    expect(
+      screen.getByText(/Each image generation uses 1 OpenAI image credit/i),
+    ).toBeInTheDocument();
+  });
+
   it("shows retry state when image generation failed", () => {
     render(
       <VariantCard
