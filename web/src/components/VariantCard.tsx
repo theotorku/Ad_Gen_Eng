@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Edit3, ImageIcon, RefreshCw, Save } from "lucide-react";
+import { Edit3, ImageIcon, RefreshCw, Save, X } from "lucide-react";
 import type { AdVariant } from "../types";
 import { fetchAssetBlobUrl } from "../api";
 import { formatChannel } from "../utils";
@@ -74,6 +74,16 @@ function VariantCard({
     setIsEditing(false);
   }
 
+  function handleCancelEdit() {
+    setDraft({
+      headline: variant.headline,
+      primary_text: variant.primary_text,
+      cta: variant.cta,
+      image_prompt: variant.image_prompt,
+    });
+    setIsEditing(false);
+  }
+
   const imageStatus = isGeneratingImage ? "generating" : variant.image_status ?? (variant.generated_asset ? "generated" : "prompt_only");
   const imageButtonLabel =
     imageStatus === "failed" ? "Retry image" : variant.generated_asset ? "Regenerate image" : "Generate image";
@@ -95,10 +105,21 @@ function VariantCard({
           {isGeneratingImage ? "Generating" : imageButtonLabel}
         </button>
         {isEditing ? (
-          <button className="ghost-action" type="button" onClick={handleSave} disabled={isSaving}>
-            <Save size={13} />
-            {isSaving ? "Saving" : "Save"}
-          </button>
+          <>
+            <button
+              className="ghost-action"
+              type="button"
+              onClick={handleCancelEdit}
+              disabled={isSaving}
+            >
+              <X size={13} />
+              Cancel
+            </button>
+            <button className="ghost-action" type="button" onClick={handleSave} disabled={isSaving}>
+              <Save size={13} />
+              {isSaving ? "Saving" : "Save"}
+            </button>
+          </>
         ) : (
           <button className="ghost-action" type="button" onClick={handleEdit} disabled={!onSave}>
             <Edit3 size={13} />

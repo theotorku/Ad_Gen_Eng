@@ -116,6 +116,20 @@ describe("VariantCard", () => {
     );
   });
 
+  it("discards an in-progress edit when Cancel is clicked", async () => {
+    const onSave = vi.fn();
+    render(<VariantCard variant={sampleVariant} index={2} onSave={onSave} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /edit/i }));
+    await userEvent.clear(screen.getByLabelText(/headline/i));
+    await userEvent.type(screen.getByLabelText(/headline/i), "Throwaway headline");
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/headline/i)).not.toBeInTheDocument();
+    expect(screen.getByText(sampleVariant.headline)).toBeInTheDocument();
+  });
+
   it("requests image generation for a variant", async () => {
     const onGenerateImage = vi.fn();
     render(<VariantCard variant={sampleVariant} index={3} onGenerateImage={onGenerateImage} />);
