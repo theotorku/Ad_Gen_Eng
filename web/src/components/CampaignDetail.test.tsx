@@ -19,6 +19,7 @@ function renderDetail(overrides: Partial<Parameters<typeof CampaignDetail>[0]> =
     onGenerateVariantImage: vi.fn(),
     onApprove: vi.fn(),
     onExport: vi.fn(),
+    onReuseBrief: vi.fn(),
     ...overrides,
   };
   render(<CampaignDetail {...props} />);
@@ -42,10 +43,19 @@ describe("CampaignDetail", () => {
         onGenerateVariantImage={vi.fn()}
         onApprove={vi.fn()}
         onExport={vi.fn()}
+        onReuseBrief={vi.fn()}
       />,
     );
 
     expect(screen.getByText(/select a campaign/i)).toBeInTheDocument();
+  });
+
+  it("calls onReuseBrief when the reuse brief button is clicked", async () => {
+    const props = renderDetail();
+
+    await userEvent.click(screen.getByRole("button", { name: /reuse brief/i }));
+
+    expect(props.onReuseBrief).toHaveBeenCalledTimes(1);
   });
 
   it("renders strategy, pillars, and at least one variant when a campaign is provided", () => {

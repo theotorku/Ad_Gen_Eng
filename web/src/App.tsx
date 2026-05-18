@@ -265,6 +265,24 @@ function App() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
+  function handleReuseBrief() {
+    if (!selectedCampaign) return;
+    const sourceBrief = selectedCampaign.bundle.brief;
+    setFormState({
+      brand_name: sourceBrief.brand_name,
+      product_name: sourceBrief.product_name,
+      objective: sourceBrief.objective,
+      target_audience: sourceBrief.target_audience,
+      pain_points: [...sourceBrief.pain_points],
+      value_props: [...sourceBrief.value_props],
+      offer: sourceBrief.offer ?? "",
+      tone: sourceBrief.tone ?? "",
+      channels: [...sourceBrief.channels],
+      constraints: [...sourceBrief.constraints],
+    });
+    setStatusMessage(`Loaded brief from ${sourceBrief.brand_name} into the form`);
+  }
+
   return (
     <div className="app-shell">
       <BriefForm
@@ -339,6 +357,7 @@ function App() {
             onGenerateVariantImage={handleGenerateVariantImage}
             onApprove={handleApproveCampaign}
             onExport={handleExportCampaign}
+            onReuseBrief={handleReuseBrief}
           />
         </section>
       </main>

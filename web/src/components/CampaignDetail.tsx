@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, Sparkles } from "lucide-react";
+import { CheckCircle2, ClipboardCopy, Download, Sparkles } from "lucide-react";
 import type { AdVariant, CampaignRecord } from "../types";
 import { formatTimestamp } from "../utils";
 import VariantCard from "./VariantCard";
@@ -20,6 +20,7 @@ type CampaignDetailProps = {
   onGenerateVariantImage: (index: number) => void;
   onApprove: () => void;
   onExport: () => void;
+  onReuseBrief: () => void;
 };
 
 function CampaignDetail({
@@ -36,6 +37,7 @@ function CampaignDetail({
   onGenerateVariantImage,
   onApprove,
   onExport,
+  onReuseBrief,
 }: CampaignDetailProps) {
   if (!campaign) {
     return (
@@ -69,6 +71,15 @@ function CampaignDetail({
           </span>
           <button className="ghost-action" type="button" onClick={onSaveNotes} disabled={isSaving}>
             {isSaving ? "Saving" : "Save notes"}
+          </button>
+          <button
+            className="ghost-action"
+            type="button"
+            onClick={onReuseBrief}
+            title="Copy this campaign's brief into the New Brief form"
+          >
+            <ClipboardCopy size={14} />
+            Reuse brief
           </button>
           <button className="ghost-action" type="button" onClick={onExport} disabled={isExporting}>
             <Download size={14} />
