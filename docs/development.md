@@ -106,13 +106,14 @@ Current verification:
 - FastAPI route tests for organization-scoped campaign access
 - Vitest + Testing Library coverage on the dashboard (`npm run test:run`) for the brief form, campaign detail, variant card, and high-level App flows
 - `tsc --noEmit` typecheck on the dashboard (`npm run typecheck`)
+- Playwright shell smoke suite (`npm run test:e2e`) covering page render, form clear/populate, theme toggle and persistence, and console-error noise. Defaults to the live Vercel deployment; override with `E2E_BASE_URL=http://localhost:5173 npm run test:e2e` to point at a local dev server. Specs live in `e2e/`, config in `playwright.config.ts`.
 
 Good next testing additions:
 
 - unit tests for `CampaignBrief` validation
 - provider-level tests for deterministic outputs
 - Postgres integration tests against a disposable database
-- end-to-end coverage of the dashboard against a running API (Playwright is already a dev dependency)
+- Playwright coverage for data-dependent flows (`Reuse brief`, variant edit `Cancel`, image regeneration confirm guard) once a seeded fixture campaign is available
 
 ## Roadmap
 
@@ -122,12 +123,17 @@ Shipped in v1.1 (dashboard polish pass):
 - form contrast, focus rings, ARIA roles on segmented controls, semantic landmarks, live regions for status and errors
 - variant edit Cancel, image regeneration cost surface + confirm guard, `Reuse brief` action
 
+In progress for v1.2:
+
+- Playwright shell smoke scaffold against the live deployment (this scaffold)
+
 Deferred to v1.2:
 
 - per-channel character-length constraints baked into the generation prompt
 - diversified hooks and image prompts across the 9-variant set
 - two-column brief layout at ≥1024px, channel-native preview dimensions per variant
 - proper first-run/empty state and loading skeletons for streaming variants
+- Playwright coverage for data-dependent flows (`Reuse brief`, variant edit `Cancel`, image regeneration confirm guard)
 
 ## Documentation Map
 

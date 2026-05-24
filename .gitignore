@@ -33,6 +33,11 @@ refactored-ui-*.png
 .playwright-cli/
 .playwright-mcp/
 
+# --- playwright e2e ---
+test-results/
+playwright-report/
+playwright/.cache/
+
 # --- editor / OS ---
 .DS_Store
 Thumbs.db
