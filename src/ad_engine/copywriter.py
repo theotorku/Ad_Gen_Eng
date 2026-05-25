@@ -94,7 +94,11 @@ def _cta_for_objective(objective: str, channel: str) -> str:
 def _trim(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
-    return text[: limit - 3].rstrip() + "..."
+    candidate = text[:limit].rstrip()
+    last_space = candidate.rfind(" ")
+    if last_space >= max(1, limit // 2):
+        return candidate[:last_space].rstrip()
+    return candidate
 
 
 def _angle_focus(angle: str) -> str:

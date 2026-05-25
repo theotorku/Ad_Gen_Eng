@@ -31,12 +31,18 @@ def test_headlines_respect_channel_limit(valid_brief):
         )
 
 
-def test_truncated_headlines_use_ellipsis(valid_brief):
+def test_truncated_headlines_end_on_word_boundary(valid_brief):
     _, variants = _build(valid_brief)
 
     for variant in variants:
-        if variant.headline.endswith("..."):
-            assert len(variant.headline) <= CHANNEL_LIMITS[variant.channel]
+        headline = variant.headline
+        assert not headline.endswith("..."), (
+            f"{variant.channel}: headline should not be padded with ellipsis: {headline!r}"
+        )
+        if len(headline) >= CHANNEL_LIMITS[variant.channel] - 2:
+            assert not headline.endswith(("-", ",", ";", ":")), (
+                f"{variant.channel}: headline ends with punctuation fragment: {headline!r}"
+            )
 
 
 def test_lead_objective_uses_book_a_demo_cta(valid_brief):
