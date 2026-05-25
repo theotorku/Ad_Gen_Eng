@@ -381,7 +381,7 @@ textarea:focus-visible {
 
 .field-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -556,6 +556,14 @@ textarea:focus-visible {
 }
 
 .status-chip { padding: 4px 12px; color: var(--ink-500); border-color: var(--rule); }
+
+.status-chip .status-time {
+  padding-left: 8px;
+  margin-left: 2px;
+  border-left: 1px solid var(--rule);
+  color: var(--ink-400, var(--ink-500));
+  font-variant-numeric: tabular-nums;
+}
 
 .status-badge.approved {
   background: var(--moss-soft);
@@ -1030,6 +1038,41 @@ textarea:focus-visible {
 }
 
 .empty-detail svg { color: var(--vermilion); }
+
+.campaigns-empty {
+  flex-direction: column;
+  text-align: center;
+  gap: 14px;
+  padding: 56px 24px;
+  min-height: 280px;
+}
+
+.campaigns-empty svg { color: var(--vermilion); }
+
+.campaigns-empty .empty-state-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 48, "SOFT" 40, "wght" 460;
+  font-size: 22px;
+  font-style: normal;
+  letter-spacing: -0.015em;
+  color: var(--ink-900);
+}
+
+.campaigns-empty .empty-state-hint {
+  margin: 0;
+  max-width: 34ch;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-500);
+}
+
+.campaigns-empty .empty-state-hint em {
+  font-style: normal;
+  color: var(--vermilion);
+}
 
 /* ============================================================
    Motion

@@ -12,6 +12,7 @@ import {
 } from "./api";
 import type { AdVariant, CampaignBrief, CampaignRecord } from "./types";
 import { BRIEF_FIELD_LABELS, EMPTY_FORM, SAMPLE_FORM } from "./constants";
+import { formatClockTime } from "./utils";
 import BriefForm from "./components/BriefForm";
 import CampaignList from "./components/CampaignList";
 import CampaignDetail from "./components/CampaignDetail";
@@ -73,6 +74,7 @@ function App() {
   const [formState, setFormState] = useState<CampaignBrief>(EMPTY_FORM);
   const [approvalNotes, setApprovalNotes] = useState("");
   const [statusMessage, setStatusMessage] = useState("Loading campaigns");
+  const [statusUpdatedAt, setStatusUpdatedAt] = useState<number>(() => Date.now());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [briefErrors, setBriefErrors] = useState<BriefErrors>({});
   const [isCreating, setIsCreating] = useState(false);
@@ -106,6 +108,10 @@ function App() {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    setStatusUpdatedAt(Date.now());
+  }, [statusMessage]);
 
   async function loadCampaigns(selectedId?: string) {
     try {
@@ -173,16 +179,22 @@ function App() {
   }
 
   async function handleSelectCampaign(campaignId: string) {
+    if (campaignId === selectedCampaignId) return;
     clearFailureStatus();
+    setErrorMessage(null);
+    // Apply the selection synchronously from the cached bundle so the click
+    // feels instant. The workspace load already pulled the full bundle, so
+    // awaiting fetchCampaign here would block the UI for the network RTT
+    // and make rapid switches look unresponsive.
+    const cached = campaigns.find((item) => item.id === campaignId) ?? null;
+    setSelectedCampaignId(campaignId);
+    setApprovalNotes(cached?.approval_notes ?? "");
     try {
-      setErrorMessage(null);
       const campaign = await fetchCampaign(campaignId);
       startTransition(() => {
         setCampaigns((current) =>
           current.map((item) => (item.id === campaign.id ? campaign : item)),
         );
-        setSelectedCampaignId(campaign.id);
-        setApprovalNotes(campaign.approval_notes ?? "");
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load campaign.";
@@ -212,6 +224,10 @@ function App() {
 
   async function handleApproveCampaign() {
     if (!selectedCampaign || isApproving) return;
+    const proceed = window.confirm(
+      `Approve "${selectedCampaign.bundle.brief.brand_name}"? This locks the campaign as approved and cannot be undone from the UI.`,
+    );
+    if (!proceed) return;
     setIsApproving(true);
     try {
       setErrorMessage(null);
@@ -403,6 +419,9 @@ function App() {
                 <RefreshCw size={12} aria-hidden="true" />
               )}
               <span>{statusMessage}</span>
+              <span className="status-time" aria-hidden="true">
+                {formatClockTime(statusUpdatedAt)}
+              </span>
             </div>
             <button
               className="ghost-action theme-toggle"

@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import type { CampaignRecord } from "../types";
 
 type CampaignListProps = {
@@ -33,7 +34,17 @@ function CampaignList({ campaigns, selectedCampaignId, onSelect }: CampaignListP
             </div>
           </button>
         ))}
-        {!campaigns.length ? <p className="empty-state">Generate a campaign to populate the dashboard.</p> : null}
+        {!campaigns.length ? (
+          <div className="empty-state campaigns-empty">
+            <FileText size={28} aria-hidden="true" />
+            <p className="empty-state-headline">No campaigns yet</p>
+            <p className="empty-state-hint">
+              Draft a brief on the left and choose <em>Generate campaign</em> to populate this list.
+              <br />
+              You can also start from <em>Load sample brief</em> to see a full example bundle.
+            </p>
+          </div>
+        ) : null}
       </div>
     </div>
   );

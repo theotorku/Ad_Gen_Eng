@@ -1,8 +1,22 @@
-import { useEffect, useState } from "react";
-import { Edit3, ImageIcon, RefreshCw, Save, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Copy, Edit3, ImageIcon, RefreshCw, Save, X } from "lucide-react";
 import type { AdVariant } from "../types";
 import { fetchAssetBlobUrl } from "../api";
 import { formatChannel } from "../utils";
+
+function buildVariantClipboardText(variant: AdVariant): string {
+  const lines = [
+    `${formatChannel(variant.channel)} — ${variant.cta}`,
+    "",
+    variant.headline,
+    "",
+    variant.primary_text,
+    "",
+    "Image prompt:",
+    variant.image_prompt,
+  ];
+  return lines.join("\n");
+}
 
 type VariantCardProps = {
   variant: AdVariant;
@@ -27,12 +41,40 @@ function VariantCard({
   const [isEditing, setIsEditing] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [regenerationCount, setRegenerationCount] = useState(0);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const copyResetTimerRef = useRef<number | null>(null);
   const [draft, setDraft] = useState({
     headline: variant.headline,
     primary_text: variant.primary_text,
     cta: variant.cta,
     image_prompt: variant.image_prompt,
   });
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  async function handleCopyVariant() {
+    const text = buildVariantClipboardText(variant);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error("Clipboard API unavailable");
+      }
+      setCopyState("copied");
+    } catch {
+      setCopyState("failed");
+    }
+    if (copyResetTimerRef.current !== null) {
+      window.clearTimeout(copyResetTimerRef.current);
+    }
+    copyResetTimerRef.current = window.setTimeout(() => setCopyState("idle"), 2000);
+  }
 
   const assetPath = variant.generated_asset?.path ?? null;
   useEffect(() => {
@@ -135,10 +177,21 @@ function VariantCard({
             </button>
           </>
         ) : (
-          <button className="ghost-action" type="button" onClick={handleEdit} disabled={!onSave}>
-            <Edit3 size={13} />
-            Edit
-          </button>
+          <>
+            <button
+              className="ghost-action"
+              type="button"
+              onClick={() => void handleCopyVariant()}
+              title="Copy this variant as plain text"
+            >
+              {copyState === "copied" ? <Check size={13} /> : <Copy size={13} />}
+              {copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy"}
+            </button>
+            <button className="ghost-action" type="button" onClick={handleEdit} disabled={!onSave}>
+              <Edit3 size={13} />
+              Edit
+            </button>
+          </>
         )}
       </div>
       {onGenerateImage && !isEditing ? (
@@ -153,7 +206,8 @@ function VariantCard({
         <div className="variant-editor">
           <label>
             <span>Headline</span>
-            <input
+            <textarea
+              rows={2}
               value={draft.headline}
               title={draft.headline}
               onChange={(event) => setDraft((current) => ({ ...current, headline: event.target.value }))}

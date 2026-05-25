@@ -8,7 +8,8 @@ describe("CampaignList", () => {
   it("renders the empty state when no campaigns exist", () => {
     render(<CampaignList campaigns={[]} selectedCampaignId={null} onSelect={vi.fn()} />);
 
-    expect(screen.getByText(/generate a campaign/i)).toBeInTheDocument();
+    expect(screen.getByText(/no campaigns yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/draft a brief/i)).toBeInTheDocument();
   });
 
   it("renders one row per campaign with brand and product names", () => {
