@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
 import re
@@ -8,12 +9,23 @@ from pathlib import Path
 from urllib import error, request
 from uuid import uuid4
 
+from PIL import Image, UnidentifiedImageError
+
 from .models import AdVariant, CampaignBrief, GeneratedAsset
 from .providers import ImageProvider
 
 
 DEFAULT_OUTPUT_DIR = "data/generated_assets"
+DEFAULT_BRAND_LOGO_DIR = "data/brand_logos"
 DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2"
+
+BRAND_LOGO_MAX_BYTES = 2 * 1024 * 1024
+BRAND_LOGO_ALLOWED_MIME_TYPES = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/webp": "webp",
+}
 
 _PROMPT_FIELD_MAX_LENGTH = 280
 _PROMPT_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -26,6 +38,11 @@ def attach_image_prompts(brief: CampaignBrief, variants: list[AdVariant]) -> Non
     audience = _sanitize_for_prompt(brief.target_audience)
     primary_value = _sanitize_for_prompt(brief.value_props[0]).lower()
 
+    logo_clause = (
+        " Leave the bottom-right corner clear of text or busy details so a brand logo can sit there cleanly."
+        if brief.brand_logo
+        else ""
+    )
     for variant in variants:
         channel = _sanitize_for_prompt(variant.channel)
         cleaned_angle = _sanitize_for_prompt(variant.angle.rstrip("."))
@@ -35,6 +52,7 @@ def attach_image_prompts(brief: CampaignBrief, variants: list[AdVariant]) -> Non
             f"Visual mood: {visual_style}. "
             f"Highlight this angle: {cleaned_angle}. "
             f"Show the benefit of {primary_value} in a realistic, campaign-ready composition."
+            f"{logo_clause}"
         )
 
 
@@ -129,6 +147,13 @@ class OpenAIImagesProvider(ImageProvider):
         file_bytes = base64.b64decode(image_base64)
         file_path.write_bytes(file_bytes)
 
+        logo_path = resolve_brand_logo_path(brief.brand_logo)
+        if logo_path is not None:
+            try:
+                composite_brand_logo(file_path, logo_path)
+            except (UnidentifiedImageError, OSError, ValueError):
+                pass
+
         generated_asset = GeneratedAsset(
             path=f"/generated-assets/{filename}",
             mime_type=_mime_type_for_format(self.output_format),
@@ -166,7 +191,8 @@ class OpenAIImagesProvider(ImageProvider):
                 return json.loads(response.read().decode("utf-8"))
         except error.HTTPError as exc:
             details = exc.read().decode("utf-8", errors="replace")
-            message = _extract_openai_error_message(details) or f"HTTP {exc.code}"
+            message = _extract_openai_error_message(
+                details) or f"HTTP {exc.code}"
             raise ValueError(
                 f"OpenAI image generation failed: {message}") from exc
         except error.URLError as exc:
@@ -185,6 +211,12 @@ class OpenAIImagesProvider(ImageProvider):
 def get_generated_asset_root() -> Path:
     configured = os.getenv("OPENAI_IMAGE_OUTPUT_DIR",
                            DEFAULT_OUTPUT_DIR).strip() or DEFAULT_OUTPUT_DIR
+    return Path(configured)
+
+
+def get_brand_logo_root() -> Path:
+    configured = os.getenv("BRAND_LOGO_DIR",
+                           DEFAULT_BRAND_LOGO_DIR).strip() or DEFAULT_BRAND_LOGO_DIR
     return Path(configured)
 
 
@@ -219,3 +251,93 @@ def _slugify(value: str) -> str:
 
 def _env_flag(name: str) -> bool:
     return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+class BrandLogoValidationError(ValueError):
+    """Raised when an uploaded brand logo fails validation."""
+
+
+def save_brand_logo(content: bytes, content_type: str | None) -> tuple[str, str]:
+    """Persist an uploaded brand logo and return (public_path, mime_type)."""
+    if not content:
+        raise BrandLogoValidationError("Brand logo upload is empty.")
+    if len(content) > BRAND_LOGO_MAX_BYTES:
+        raise BrandLogoValidationError(
+            "Brand logo must be 2 MB or smaller."
+        )
+
+    mime = (content_type or "").split(";")[0].strip().lower()
+    if mime not in BRAND_LOGO_ALLOWED_MIME_TYPES:
+        raise BrandLogoValidationError(
+            "Brand logo must be a PNG, JPEG, or WEBP image."
+        )
+    extension = BRAND_LOGO_ALLOWED_MIME_TYPES[mime]
+
+    try:
+        with Image.open(io.BytesIO(content)) as probe:
+            probe.verify()
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise BrandLogoValidationError(
+            "Brand logo could not be decoded as an image."
+        ) from exc
+
+    root = get_brand_logo_root()
+    root.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}.{extension}"
+    (root / filename).write_bytes(content)
+    return f"/brand-logos/{filename}", f"image/{extension if extension != 'jpg' else 'jpeg'}"
+
+
+def resolve_brand_logo_path(public_path: str | None) -> Path | None:
+    if not public_path:
+        return None
+    prefix = "/brand-logos/"
+    if not public_path.startswith(prefix):
+        return None
+    filename = public_path[len(prefix):]
+    if not filename or "/" in filename or "\\" in filename or ".." in filename:
+        return None
+    root = get_brand_logo_root().resolve()
+    candidate = (root / filename).resolve()
+    if not candidate.is_relative_to(root):
+        return None
+    if not candidate.is_file():
+        return None
+    return candidate
+
+
+def composite_brand_logo(
+    image_path: Path,
+    logo_path: Path,
+    *,
+    logo_fraction: float = 0.12,
+    margin_fraction: float = 0.03,
+) -> None:
+    """Paste the logo onto the bottom-right of the image, preserving alpha."""
+    with Image.open(image_path) as base_image:
+        base = base_image.convert("RGBA")
+    with Image.open(logo_path) as logo_image:
+        logo = logo_image.convert("RGBA")
+
+    base_long_edge = max(base.size)
+    target_long_edge = max(1, int(base_long_edge * logo_fraction))
+    logo_long_edge = max(logo.size)
+    if logo_long_edge == 0:
+        return
+    scale = target_long_edge / logo_long_edge
+    new_size = (max(1, int(logo.width * scale)),
+                max(1, int(logo.height * scale)))
+    logo_resized = logo.resize(new_size, Image.LANCZOS)
+
+    margin = max(1, int(base_long_edge * margin_fraction))
+    position = (
+        base.width - logo_resized.width - margin,
+        base.height - logo_resized.height - margin,
+    )
+
+    base.alpha_composite(logo_resized, dest=position)
+    output_format = (Image.open(image_path).format or "PNG").upper()
+    if output_format == "JPEG":
+        base.convert("RGB").save(image_path, format="JPEG", quality=92)
+    else:
+        base.save(image_path, format=output_format)

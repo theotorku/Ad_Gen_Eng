@@ -5,12 +5,18 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict
 
-from .assets import get_generated_asset_root
+from .assets import (
+    BRAND_LOGO_MAX_BYTES,
+    BrandLogoValidationError,
+    get_brand_logo_root,
+    get_generated_asset_root,
+    save_brand_logo,
+)
 from .auth import AuthContext, AuthSettings, AuthenticationError, resolve_auth_context
 from .config import DEFAULT_CORS_ORIGINS
 from .engine import AdGenerationEngine
@@ -90,7 +96,8 @@ def create_app(
                 organization_id=auth.organization_id,
             )
         except ValueError as exc:
-            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
 
         return stored.to_dict()
 
@@ -159,7 +166,8 @@ def create_app(
                 metadata=payload.metadata,
             )
         except ValueError as exc:
-            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
 
         if stored is None:
             raise HTTPException(
@@ -208,7 +216,8 @@ def create_app(
                 image_prompt=payload.image_prompt,
             )
         except ValueError as exc:
-            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
 
         if stored is None:
             raise HTTPException(
@@ -240,7 +249,8 @@ def create_app(
             )
 
         image_provider = app.state.engine.providers.image
-        generate_variant_image = getattr(image_provider, "generate_variant_image", None)
+        generate_variant_image = getattr(
+            image_provider, "generate_variant_image", None)
         if generate_variant_image is None:
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
@@ -328,11 +338,52 @@ def create_app(
         asset_root = get_generated_asset_root().resolve()
         asset_path = (asset_root / filename.strip()).resolve()
         if not asset_path.is_relative_to(asset_root):
-            raise HTTPException(status_code=HTTPStatus.BAD_REQUEST, detail="Invalid asset path.")
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, detail="Invalid asset path.")
         if not asset_path.exists() or not asset_path.is_file():
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND,
                 detail="Generated asset not found.",
+            )
+        return FileResponse(asset_path)
+
+    @app.post("/assets/brand-logos", status_code=HTTPStatus.CREATED)
+    async def upload_brand_logo(
+        file: UploadFile = File(...),
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        _auth_context(app, x_api_key, x_organization_id)
+        content = await file.read(BRAND_LOGO_MAX_BYTES + 1)
+        if len(content) > BRAND_LOGO_MAX_BYTES:
+            raise HTTPException(
+                status_code=HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                detail="Brand logo must be 2 MB or smaller.",
+            )
+        try:
+            public_path, mime_type = save_brand_logo(
+                content, file.content_type)
+        except BrandLogoValidationError as exc:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
+        return {"path": public_path, "mime_type": mime_type, "size": len(content)}
+
+    @app.get("/brand-logos/{filename:path}")
+    def brand_logo_asset(
+        filename: str,
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+    ) -> FileResponse:
+        _auth_context(app, x_api_key, x_organization_id)
+        asset_root = get_brand_logo_root().resolve()
+        asset_path = (asset_root / filename.strip()).resolve()
+        if not asset_path.is_relative_to(asset_root):
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST, detail="Invalid asset path.")
+        if not asset_path.exists() or not asset_path.is_file():
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND,
+                detail="Brand logo not found.",
             )
         return FileResponse(asset_path)
 
@@ -381,7 +432,8 @@ def _auth_context(
             requested_organization_id=organization_id,
         )
     except AuthenticationError as exc:
-        raise HTTPException(status_code=HTTPStatus.UNAUTHORIZED, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=HTTPStatus.UNAUTHORIZED, detail=str(exc)) from exc
 
 
 def _load_cors_origins() -> tuple[frozenset[str], bool]:
@@ -433,6 +485,7 @@ def _campaign_export_text(campaign: dict[str, Any]) -> str:
 
 
 def _safe_filename(value: str) -> str:
-    cleaned = "".join(char.lower() if char.isalnum() else "-" for char in value)
+    cleaned = "".join(char.lower() if char.isalnum()
+                      else "-" for char in value)
     collapsed = "-".join(part for part in cleaned.split("-") if part)
     return collapsed or "campaign"

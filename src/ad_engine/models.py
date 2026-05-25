@@ -11,9 +11,13 @@ MAX_TEXT_FIELD_LENGTH = 500
 MAX_OFFER_LENGTH = 1000
 MAX_LIST_ITEM_LENGTH = 500
 MAX_LIST_ITEMS = 20
+MAX_BRAND_LOGO_PATH_LENGTH = 200
+BRAND_LOGO_PATH_PREFIX = "/brand-logos/"
+BRAND_LOGO_ALLOWED_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _WHITESPACE_RUN_RE = re.compile(r"\s+")
+_BRAND_LOGO_FILENAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 @dataclass(slots=True)
@@ -28,6 +32,7 @@ class CampaignBrief:
     tone: str = "confident"
     channels: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
+    brand_logo: str | None = None
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "CampaignBrief":
@@ -35,13 +40,15 @@ class CampaignBrief:
             brand_name=_clean_text(str(payload.get("brand_name", ""))),
             product_name=_clean_text(str(payload.get("product_name", ""))),
             objective=_clean_text(str(payload.get("objective", ""))),
-            target_audience=_clean_text(str(payload.get("target_audience", ""))),
+            target_audience=_clean_text(
+                str(payload.get("target_audience", ""))),
             pain_points=_normalize_list(payload.get("pain_points")),
             value_props=_normalize_list(payload.get("value_props")),
             offer=_normalize_optional_text(payload.get("offer")),
             tone=_normalize_optional_text(payload.get("tone")) or "confident",
             channels=_normalize_list(payload.get("channels")),
             constraints=_normalize_list(payload.get("constraints")),
+            brand_logo=_normalize_brand_logo(payload.get("brand_logo")),
         )
         brief.validate()
         return brief
@@ -53,7 +60,8 @@ class CampaignBrief:
             "objective": self.objective,
             "target_audience": self.target_audience,
         }
-        missing = [name for name, value in required_fields.items() if not value]
+        missing = [name for name, value in required_fields.items()
+                   if not value]
         if missing:
             joined = ", ".join(missing)
             raise ValueError(f"Missing required brief fields: {joined}")
@@ -63,7 +71,8 @@ class CampaignBrief:
         if not self.channels:
             raise ValueError("At least one channel is required.")
 
-        invalid_channels = [channel for channel in self.channels if channel not in SUPPORTED_CHANNELS]
+        invalid_channels = [
+            channel for channel in self.channels if channel not in SUPPORTED_CHANNELS]
         if invalid_channels:
             joined = ", ".join(invalid_channels)
             raise ValueError(f"Unsupported channels: {joined}")
@@ -82,6 +91,9 @@ class CampaignBrief:
             raise ValueError(
                 f"Field 'tone' exceeds maximum length of {MAX_TEXT_FIELD_LENGTH} characters."
             )
+
+        if self.brand_logo is not None:
+            _validate_brand_logo_path(self.brand_logo)
 
         for list_name, items in (
             ("pain_points", self.pain_points),
@@ -186,6 +198,36 @@ def _normalize_optional_text(value: Any) -> str | None:
         return None
     normalized = _clean_text(str(value))
     return normalized or None
+
+
+def _normalize_brand_logo(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("Field 'brand_logo' must be a string path or null.")
+    stripped = value.strip()
+    return stripped or None
+
+
+def _validate_brand_logo_path(value: str) -> None:
+    if len(value) > MAX_BRAND_LOGO_PATH_LENGTH:
+        raise ValueError(
+            f"Field 'brand_logo' exceeds maximum length of {MAX_BRAND_LOGO_PATH_LENGTH} characters."
+        )
+    if not value.startswith(BRAND_LOGO_PATH_PREFIX):
+        raise ValueError(
+            f"Field 'brand_logo' must be a path starting with '{BRAND_LOGO_PATH_PREFIX}'."
+        )
+    filename = value[len(BRAND_LOGO_PATH_PREFIX):]
+    if not filename or "/" in filename or "\\" in filename or ".." in filename:
+        raise ValueError("Field 'brand_logo' contains an invalid filename.")
+    if not _BRAND_LOGO_FILENAME_RE.match(filename):
+        raise ValueError("Field 'brand_logo' contains an invalid filename.")
+    suffix = filename.rsplit(".", 1)
+    if len(suffix) != 2 or f".{suffix[1].lower()}" not in BRAND_LOGO_ALLOWED_EXTENSIONS:
+        joined = ", ".join(BRAND_LOGO_ALLOWED_EXTENSIONS)
+        raise ValueError(
+            f"Field 'brand_logo' must have one of these extensions: {joined}.")
 
 
 def _clean_text(value: str) -> str:
