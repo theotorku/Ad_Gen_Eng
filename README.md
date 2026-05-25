@@ -175,6 +175,7 @@ Use `AD_ENGINE_IMAGE_PROVIDER=prompt_template` when you want local prompt genera
 The React dashboard is a lightweight SaaS MVP shell with:
 
 - campaign creation form with `Load sample brief` and `Clear` shortcuts
+- inline client-side brief validation that blocks the request and flags missing required fields before hitting the API
 - campaign list view
 - campaign detail, copy editing, export, and approval workspace
 - `Reuse brief` action that copies a selected campaign's brief back into the form

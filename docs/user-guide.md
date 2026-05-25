@@ -80,7 +80,9 @@ You will fill in:
 - constraints
 - channels
 
-The form starts blank on each session so a selected campaign on the right never overwrites what you are typing. Use `Load sample brief` to drop in the demo payload or `Clear` to reset the form to empty.
+Required fields are marked with a small asterisk next to the label. If you select `Generate campaign` before filling them in, the form blocks the request and surfaces the missing fields inline beneath each input.
+
+The form starts blank on each session so a selected campaign on the right never overwrites what you are typing. Use `Load sample brief` to drop in the demo payload or `Clear` to reset the form to empty. `Load sample brief` asks for confirmation before overwriting if the form already has content.
 
 ### Campaign List
 
@@ -114,8 +116,8 @@ You can:
 1. Fill in the campaign form on the left side of the dashboard.
 2. Add each pain point on its own line.
 3. Add each value proposition on its own line.
-4. Choose the channels you want included.
-5. Select `Generate campaign`.
+4. Choose at least one channel. The form blocks generation if no channels are selected.
+5. Select `Generate campaign`. Any missing required fields are flagged inline before the request is sent.
 
 The app will create:
 
@@ -156,6 +158,8 @@ Check these areas:
 - the image prompts: do they match the brand and audience?
 
 If a variant is close but needs final polish, use `Edit` on that variant. If the strategy is wrong, update the campaign brief and generate a new campaign.
+
+Variant headlines are clipped to keep cards aligned. Hover a clipped headline to see its full text in a tooltip without opening the editor.
 
 ## How To Edit Generated Variants
 
