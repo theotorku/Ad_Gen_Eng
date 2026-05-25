@@ -43,7 +43,12 @@ describe("App", () => {
 
     render(<App />);
 
-    const generateButton = await screen.findByRole("button", { name: /generate campaign/i });
+    // Load the sample brief so the client-side validation passes. Without
+    // this the Generate button is a no-op against an empty form.
+    const loadSample = await screen.findByRole("button", { name: /load sample brief/i });
+    await user.click(loadSample);
+
+    const generateButton = screen.getByRole("button", { name: /generate campaign/i });
     await user.click(generateButton);
     await user.click(generateButton);
 

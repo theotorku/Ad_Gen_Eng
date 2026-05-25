@@ -7,6 +7,7 @@ type ListField = "pain_points" | "value_props" | "constraints";
 type BriefFormProps = {
   formState: CampaignBrief;
   isPending: boolean;
+  briefErrors?: Partial<Record<keyof CampaignBrief, string>>;
   onFieldChange: (field: keyof CampaignBrief, value: string) => void;
   onListFieldChange: (field: ListField, value: string) => void;
   onChannelToggle: (channel: string) => void;
@@ -18,6 +19,7 @@ type BriefFormProps = {
 function BriefForm({
   formState,
   isPending,
+  briefErrors = {},
   onFieldChange,
   onListFieldChange,
   onChannelToggle,
@@ -25,6 +27,18 @@ function BriefForm({
   onLoadSample,
   onReset,
 }: BriefFormProps) {
+  const errorFor = (field: keyof CampaignBrief) => briefErrors[field];
+  const fieldClass = (field: keyof CampaignBrief) =>
+    errorFor(field) ? "field has-error" : "field";
+  function renderError(field: keyof CampaignBrief) {
+    const message = errorFor(field);
+    if (!message) return null;
+    return (
+      <span className="field-error" role="alert">
+        {message}
+      </span>
+    );
+  }
   return (
     <aside className="left-rail">
       <div className="rail-header">
@@ -80,37 +94,53 @@ function BriefForm({
           </div>
         )}
 
-        <label>
-          <span>Brand</span>
+        <label className={fieldClass("brand_name")}>
+          <span>
+            Brand<span className="required-mark" aria-hidden="true">*</span>
+          </span>
           <input
             value={formState.brand_name}
+            aria-invalid={Boolean(errorFor("brand_name"))}
             onChange={(event) => onFieldChange("brand_name", event.target.value)}
           />
+          {renderError("brand_name")}
         </label>
 
-        <label>
-          <span>Product</span>
+        <label className={fieldClass("product_name")}>
+          <span>
+            Product<span className="required-mark" aria-hidden="true">*</span>
+          </span>
           <input
             value={formState.product_name}
+            aria-invalid={Boolean(errorFor("product_name"))}
             onChange={(event) => onFieldChange("product_name", event.target.value)}
           />
+          {renderError("product_name")}
         </label>
 
-        <label>
-          <span>Objective</span>
+        <label className={fieldClass("objective")}>
+          <span>
+            Objective<span className="required-mark" aria-hidden="true">*</span>
+          </span>
           <input
             value={formState.objective}
+            aria-invalid={Boolean(errorFor("objective"))}
             onChange={(event) => onFieldChange("objective", event.target.value)}
           />
+          {renderError("objective")}
         </label>
 
-        <label>
-          <span>Audience</span>
+        <label className={fieldClass("target_audience")}>
+          <span>
+            Audience<span className="required-mark" aria-hidden="true">*</span>
+          </span>
           <textarea
             rows={3}
             value={formState.target_audience}
+            aria-invalid={Boolean(errorFor("target_audience"))}
             onChange={(event) => onFieldChange("target_audience", event.target.value)}
           />
+          {renderError("target_audience")}
         </label>
 
         <label>
@@ -158,14 +188,19 @@ function BriefForm({
           />
         </label>
 
-        <div>
+        <div className={fieldClass("channels")}>
           <span className="field-label" id="channels-label">
-            Channels
+            Channels<span className="required-mark" aria-hidden="true">*</span>
           </span>
           <div
-            className="segmented-control"
+            className={
+              errorFor("channels")
+                ? "segmented-control has-error"
+                : "segmented-control"
+            }
             role="group"
             aria-labelledby="channels-label"
+            aria-invalid={Boolean(errorFor("channels"))}
           >
             {CHANNEL_OPTIONS.map((channel) => {
               const selected = formState.channels.includes(channel.value);
@@ -182,6 +217,7 @@ function BriefForm({
               );
             })}
           </div>
+          {renderError("channels")}
         </div>
 
         <button className="primary-action" type="button" onClick={onSubmit} disabled={isPending}>

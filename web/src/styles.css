@@ -331,6 +331,31 @@ input:focus, textarea:focus {
   border-color: var(--vermilion);
 }
 
+.required-mark {
+  margin-left: 3px;
+  color: var(--vermilion);
+}
+
+.field-error {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--danger);
+}
+
+.field.has-error input,
+.field.has-error textarea {
+  border-color: var(--danger);
+}
+
+.segmented-control.has-error {
+  border-color: var(--danger);
+}
+
 input:focus { border-bottom-width: 2px; padding-bottom: 8px; }
 
 input:focus-visible,

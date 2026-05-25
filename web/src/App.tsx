@@ -32,6 +32,34 @@ function humanizeBriefError(message: string): string {
   );
 }
 
+type BriefErrors = Partial<Record<keyof CampaignBrief, string>>;
+
+function validateBrief(brief: CampaignBrief): BriefErrors {
+  const errors: BriefErrors = {};
+  if (!brief.brand_name.trim()) errors.brand_name = "Brand is required.";
+  if (!brief.product_name.trim()) errors.product_name = "Product is required.";
+  if (!brief.objective.trim()) errors.objective = "Objective is required.";
+  if (!brief.target_audience.trim())
+    errors.target_audience = "Audience is required.";
+  if (brief.channels.length === 0)
+    errors.channels = "Select at least one channel.";
+  return errors;
+}
+
+function isBriefDirty(brief: CampaignBrief): boolean {
+  if (brief.brand_name.trim()) return true;
+  if (brief.product_name.trim()) return true;
+  if (brief.objective.trim()) return true;
+  if (brief.target_audience.trim()) return true;
+  if (brief.offer?.trim()) return true;
+  if (brief.tone?.trim()) return true;
+  if (brief.channels.length > 0) return true;
+  if (brief.pain_points.length > 0) return true;
+  if (brief.value_props.length > 0) return true;
+  if (brief.constraints.length > 0) return true;
+  return false;
+}
+
 function getInitialTheme(): ThemeMode {
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
   if (storedTheme === "light" || storedTheme === "dark") {
@@ -47,6 +75,7 @@ function App() {
   const [approvalNotes, setApprovalNotes] = useState("");
   const [statusMessage, setStatusMessage] = useState("Loading campaigns");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [briefErrors, setBriefErrors] = useState<BriefErrors>({});
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savingVariantIndex, setSavingVariantIndex] = useState<number | null>(null);
@@ -102,6 +131,14 @@ function App() {
 
   async function handleCreateCampaign() {
     if (isCreating) return;
+    const validation = validateBrief(formState);
+    if (Object.keys(validation).length > 0) {
+      setBriefErrors(validation);
+      setErrorMessage(null);
+      setStatusMessage("Fix the highlighted fields and try again");
+      return;
+    }
+    setBriefErrors({});
     setIsCreating(true);
     try {
       setErrorMessage(null);
@@ -120,9 +157,20 @@ function App() {
 
   function clearFailureStatus() {
     setStatusMessage((current) =>
-      FAILURE_STATUS_RE.test(current) ? IDLE_STATUS : current,
+      FAILURE_STATUS_RE.test(current) || current === "Fix the highlighted fields and try again"
+        ? IDLE_STATUS
+        : current,
     );
     setErrorMessage((current) => (current ? null : current));
+  }
+
+  function clearBriefError(field: keyof CampaignBrief) {
+    setBriefErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
   }
 
   async function handleSelectCampaign(campaignId: string) {
@@ -259,6 +307,7 @@ function App() {
 
   function handleFieldChange(field: keyof CampaignBrief, value: string) {
     clearFailureStatus();
+    clearBriefError(field);
     setFormState((current) => ({ ...current, [field]: value }));
   }
 
@@ -267,12 +316,14 @@ function App() {
     value: string,
   ) {
     clearFailureStatus();
+    clearBriefError(field);
     const items = value.split("\n").map((item) => item.trim()).filter(Boolean);
     setFormState((current) => ({ ...current, [field]: items }));
   }
 
   function handleChannelToggle(channel: string) {
     clearFailureStatus();
+    clearBriefError("channels");
     setFormState((current) => {
       const exists = current.channels.includes(channel);
       return {
@@ -291,6 +342,7 @@ function App() {
   function handleReuseBrief() {
     if (!selectedCampaign) return;
     const sourceBrief = selectedCampaign.bundle.brief;
+    setBriefErrors({});
     setFormState({
       brand_name: sourceBrief.brand_name,
       product_name: sourceBrief.product_name,
@@ -306,17 +358,36 @@ function App() {
     setStatusMessage(`Loaded brief from ${sourceBrief.brand_name} into the form`);
   }
 
+  function handleLoadSample() {
+    if (isBriefDirty(formState)) {
+      const proceed = window.confirm(
+        "Load the Northstar AI sample? This will replace your current brief.",
+      );
+      if (!proceed) return;
+    }
+    setBriefErrors({});
+    clearFailureStatus();
+    setFormState(SAMPLE_FORM);
+  }
+
+  function handleResetForm() {
+    setBriefErrors({});
+    clearFailureStatus();
+    setFormState(EMPTY_FORM);
+  }
+
   return (
     <div className="app-shell">
       <BriefForm
         formState={formState}
         isPending={isCreating}
+        briefErrors={briefErrors}
         onFieldChange={handleFieldChange}
         onListFieldChange={handleListFieldChange}
         onChannelToggle={handleChannelToggle}
         onSubmit={handleCreateCampaign}
-        onLoadSample={() => setFormState(SAMPLE_FORM)}
-        onReset={() => setFormState(EMPTY_FORM)}
+        onLoadSample={handleLoadSample}
+        onReset={handleResetForm}
       />
 
       <main className="workspace">
