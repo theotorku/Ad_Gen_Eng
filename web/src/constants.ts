@@ -18,6 +18,7 @@ export const SAMPLE_FORM: CampaignBrief = {
   tone: "confident",
   channels: ["linkedin", "facebook", "google_search"],
   constraints: ["Avoid exaggerated performance claims"],
+  brand_logo: null,
 };
 
 export const BRIEF_FIELD_LABELS: Record<string, string> = {
@@ -31,6 +32,7 @@ export const BRIEF_FIELD_LABELS: Record<string, string> = {
   tone: "Tone",
   channels: "Channels",
   constraints: "Constraints",
+  brand_logo: "Brand logo",
 };
 
 export const EMPTY_FORM: CampaignBrief = {
@@ -44,4 +46,8 @@ export const EMPTY_FORM: CampaignBrief = {
   tone: "",
   channels: [],
   constraints: [],
+  brand_logo: null,
 };
+
+export const BRAND_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const BRAND_LOGO_ACCEPT = "image/png,image/jpeg,image/webp";

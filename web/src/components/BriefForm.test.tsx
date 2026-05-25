@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import BriefForm from "./BriefForm";
 import { sampleBrief } from "../test-fixtures";
+import * as api from "../api";
 
 function renderForm(overrides: Partial<Parameters<typeof BriefForm>[0]> = {}) {
   const props = {
@@ -12,6 +13,7 @@ function renderForm(overrides: Partial<Parameters<typeof BriefForm>[0]> = {}) {
     onListFieldChange: vi.fn(),
     onChannelToggle: vi.fn(),
     onSubmit: vi.fn(),
+    onBrandLogoChange: vi.fn(),
     ...overrides,
   };
   render(<BriefForm {...props} />);
@@ -101,5 +103,61 @@ describe("BriefForm", () => {
 
     expect(screen.queryByRole("button", { name: /load sample brief/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^clear$/i })).not.toBeInTheDocument();
+  });
+
+  it("shows the brand logo upload control by default", () => {
+    renderForm();
+
+    expect(screen.getByRole("button", { name: /upload logo/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^remove$/i })).not.toBeInTheDocument();
+  });
+
+  it("uploads a selected logo and reports the resulting path", async () => {
+    const uploadSpy = vi.spyOn(api, "uploadBrandLogo").mockResolvedValue({
+      path: "/brand-logos/abc123.png",
+      mime_type: "image/png",
+      size: 42,
+    });
+    const onBrandLogoChange = vi.fn();
+    renderForm({ onBrandLogoChange });
+
+    const file = new File(["fake"], "logo.png", { type: "image/png" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await userEvent.upload(input, file);
+
+    await waitFor(() =>
+      expect(onBrandLogoChange).toHaveBeenCalledWith("/brand-logos/abc123.png"),
+    );
+    expect(uploadSpy).toHaveBeenCalledTimes(1);
+    uploadSpy.mockRestore();
+  });
+
+  it("shows a remove button and preview when a logo is already attached", async () => {
+    vi.spyOn(api, "fetchAssetBlobUrl").mockResolvedValue("blob:preview");
+    renderForm({
+      formState: { ...sampleBrief, brand_logo: "/brand-logos/abc123.png" },
+    });
+
+    expect(screen.getByRole("button", { name: /replace logo/i })).toBeInTheDocument();
+    const removeButton = screen.getByRole("button", { name: /^remove$/i });
+    expect(removeButton).toBeInTheDocument();
+
+    await waitFor(() => {
+      const preview = screen.getByAltText(/brand logo preview/i) as HTMLImageElement;
+      expect(preview.src).toContain("blob:preview");
+    });
+  });
+
+  it("invokes onBrandLogoChange(null) when the remove button is clicked", async () => {
+    vi.spyOn(api, "fetchAssetBlobUrl").mockResolvedValue("blob:preview");
+    const onBrandLogoChange = vi.fn();
+    renderForm({
+      formState: { ...sampleBrief, brand_logo: "/brand-logos/abc123.png" },
+      onBrandLogoChange,
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+
+    expect(onBrandLogoChange).toHaveBeenCalledWith(null);
   });
 });

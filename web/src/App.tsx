@@ -57,6 +57,7 @@ function isBriefDirty(brief: CampaignBrief): boolean {
   if (brief.pain_points.length > 0) return true;
   if (brief.value_props.length > 0) return true;
   if (brief.constraints.length > 0) return true;
+  if (brief.brand_logo) return true;
   return false;
 }
 
@@ -369,8 +370,14 @@ function App() {
       tone: sourceBrief.tone ?? "",
       channels: [...sourceBrief.channels],
       constraints: [...sourceBrief.constraints],
+      brand_logo: sourceBrief.brand_logo ?? null,
     });
     setStatusMessage(`Loaded brief from ${sourceBrief.brand_name} into the form`);
+  }
+
+  function handleBrandLogoChange(path: string | null) {
+    clearFailureStatus();
+    setFormState((current) => ({ ...current, brand_logo: path }));
   }
 
   function handleLoadSample() {
@@ -403,6 +410,7 @@ function App() {
         onSubmit={handleCreateCampaign}
         onLoadSample={handleLoadSample}
         onReset={handleResetForm}
+        onBrandLogoChange={handleBrandLogoChange}
       />
 
       <main className="workspace">

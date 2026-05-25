@@ -9,6 +9,13 @@ export type CampaignBrief = {
   tone?: string | null;
   channels: string[];
   constraints: string[];
+  brand_logo?: string | null;
+};
+
+export type BrandLogoUploadResponse = {
+  path: string;
+  mime_type: string;
+  size: number;
 };
 
 export type CreativePlan = {

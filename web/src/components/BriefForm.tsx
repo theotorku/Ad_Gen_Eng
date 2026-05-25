@@ -1,6 +1,12 @@
-import { RotateCcw, Send, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import type { CampaignBrief } from "../types";
-import { CHANNEL_OPTIONS } from "../constants";
+import { fetchAssetBlobUrl, uploadBrandLogo } from "../api";
+import {
+  BRAND_LOGO_ACCEPT,
+  BRAND_LOGO_MAX_BYTES,
+  CHANNEL_OPTIONS,
+} from "../constants";
 
 type ListField = "pain_points" | "value_props" | "constraints";
 
@@ -14,6 +20,7 @@ type BriefFormProps = {
   onSubmit: () => void;
   onLoadSample?: () => void;
   onReset?: () => void;
+  onBrandLogoChange: (path: string | null) => void;
 };
 
 function BriefForm({
@@ -26,10 +33,67 @@ function BriefForm({
   onSubmit,
   onLoadSample,
   onReset,
+  onBrandLogoChange,
 }: BriefFormProps) {
   const errorFor = (field: keyof CampaignBrief) => briefErrors[field];
   const fieldClass = (field: keyof CampaignBrief) =>
     errorFor(field) ? "field has-error" : "field";
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let revokedUrl: string | null = null;
+    let cancelled = false;
+    if (!formState.brand_logo) {
+      setLogoPreview(null);
+      return;
+    }
+    void fetchAssetBlobUrl(formState.brand_logo)
+      .then((url) => {
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        revokedUrl = url;
+        setLogoPreview(url);
+      })
+      .catch(() => {
+        if (!cancelled) setLogoPreview(null);
+      });
+    return () => {
+      cancelled = true;
+      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
+    };
+  }, [formState.brand_logo]);
+
+  async function handleLogoSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > BRAND_LOGO_MAX_BYTES) {
+      setLogoError("Logo must be 2 MB or smaller.");
+      return;
+    }
+    setLogoUploading(true);
+    setLogoError(null);
+    try {
+      const result = await uploadBrandLogo(file);
+      onBrandLogoChange(result.path);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Logo upload failed.";
+      setLogoError(message);
+    } finally {
+      setLogoUploading(false);
+    }
+  }
+
+  function handleRemoveLogo() {
+    setLogoError(null);
+    onBrandLogoChange(null);
+  }
   function renderError(field: keyof CampaignBrief) {
     const message = errorFor(field);
     if (!message) return null;
@@ -190,6 +254,64 @@ function BriefForm({
             onChange={(event) => onListFieldChange("constraints", event.target.value)}
           />
         </label>
+
+        <div className="field brand-logo-field">
+          <span className="field-label">Brand logo</span>
+          <p className="form-hint">
+            PNG, JPEG, or WEBP up to 2 MB. The logo is composited onto the
+            bottom-right corner of every generated image for visual consistency.
+          </p>
+          <div className="brand-logo-row">
+            {logoPreview ? (
+              <img
+                src={logoPreview}
+                alt="Uploaded brand logo preview"
+                className="brand-logo-preview"
+              />
+            ) : (
+              <div className="brand-logo-placeholder" aria-hidden="true">
+                <ImagePlus size={18} />
+              </div>
+            )}
+            <div className="brand-logo-actions">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={BRAND_LOGO_ACCEPT}
+                hidden
+                onChange={handleLogoSelect}
+              />
+              <button
+                type="button"
+                className="ghost-action"
+                disabled={isPending || logoUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImagePlus size={12} />
+                {formState.brand_logo ? "Replace logo" : "Upload logo"}
+              </button>
+              {formState.brand_logo ? (
+                <button
+                  type="button"
+                  className="ghost-action"
+                  disabled={isPending || logoUploading}
+                  onClick={handleRemoveLogo}
+                >
+                  <X size={12} />
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </div>
+          {logoUploading ? (
+            <span className="field-hint">Uploading logo&hellip;</span>
+          ) : null}
+          {logoError ? (
+            <span className="field-error" role="alert">
+              {logoError}
+            </span>
+          ) : null}
+        </div>
 
         <div className={fieldClass("channels")}>
           <span className="field-label" id="channels-label">

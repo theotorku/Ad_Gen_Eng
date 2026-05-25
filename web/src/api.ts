@@ -1,4 +1,10 @@
-import type { AdVariant, CampaignBrief, CampaignListResponse, CampaignRecord } from "./types";
+import type {
+  AdVariant,
+  BrandLogoUploadResponse,
+  CampaignBrief,
+  CampaignListResponse,
+  CampaignRecord,
+} from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID || "default";
@@ -121,4 +127,27 @@ export async function fetchAssetBlobUrl(path: string): Promise<string> {
   }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
+}
+
+export async function uploadBrandLogo(file: File): Promise<BrandLogoUploadResponse> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch(`${API_BASE_URL}/assets/brand-logos`, {
+    method: "POST",
+    headers: {
+      "X-Organization-ID": ORGANIZATION_ID,
+      ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    },
+    body,
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: string;
+      error?: string;
+    } | null;
+    throw new Error(
+      payload?.error ?? payload?.detail ?? `Upload failed with status ${response.status}`,
+    );
+  }
+  return (await response.json()) as BrandLogoUploadResponse;
 }
