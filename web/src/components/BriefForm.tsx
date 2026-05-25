@@ -40,14 +40,18 @@ function BriefForm({
     errorFor(field) ? "field has-error" : "field";
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
 
   useEffect(() => {
-    let revokedUrl: string | null = null;
     let cancelled = false;
     if (!formState.brand_logo) {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
       setLogoPreview(null);
       return;
     }
@@ -57,7 +61,8 @@ function BriefForm({
           URL.revokeObjectURL(url);
           return;
         }
-        revokedUrl = url;
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
         setLogoPreview(url);
       })
       .catch(() => {
@@ -65,9 +70,17 @@ function BriefForm({
       });
     return () => {
       cancelled = true;
-      if (revokedUrl) URL.revokeObjectURL(revokedUrl);
     };
   }, [formState.brand_logo]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, []);
 
   async function handleLogoSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
