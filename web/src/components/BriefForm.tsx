@@ -112,6 +112,7 @@ function BriefForm({
           </span>
           <input
             value={formState.product_name}
+            title={formState.product_name}
             aria-invalid={Boolean(errorFor("product_name"))}
             onChange={(event) => onFieldChange("product_name", event.target.value)}
           />
@@ -124,6 +125,7 @@ function BriefForm({
           </span>
           <input
             value={formState.objective}
+            title={formState.objective}
             aria-invalid={Boolean(errorFor("objective"))}
             onChange={(event) => onFieldChange("objective", event.target.value)}
           />
@@ -166,6 +168,7 @@ function BriefForm({
             <span>Offer</span>
             <input
               value={formState.offer ?? ""}
+              title={formState.offer ?? ""}
               onChange={(event) => onFieldChange("offer", event.target.value)}
             />
           </label>

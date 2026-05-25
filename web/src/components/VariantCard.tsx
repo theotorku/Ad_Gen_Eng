@@ -155,6 +155,7 @@ function VariantCard({
             <span>Headline</span>
             <input
               value={draft.headline}
+              title={draft.headline}
               onChange={(event) => setDraft((current) => ({ ...current, headline: event.target.value }))}
             />
           </label>
@@ -188,7 +189,7 @@ function VariantCard({
         </div>
       ) : (
         <>
-          <h5>{variant.headline}</h5>
+          <h5 title={variant.headline}>{variant.headline}</h5>
           {variant.generated_asset && imageUrl ? (
             <img
               className="variant-image"
