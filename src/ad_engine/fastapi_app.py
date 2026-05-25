@@ -57,10 +57,11 @@ def create_app(
     app.state.store = store or build_campaign_store(StoreSettings.from_env())
     app.state.auth_settings = AuthSettings.from_env()
 
-    origins, allow_any = _load_cors_origins()
+    origins, allow_any, origin_regex = _load_cors_origins()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"] if allow_any else list(origins),
+        allow_origin_regex=origin_regex,
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Content-Type", "X-Organization-ID", "X-API-Key"],
     )
@@ -436,14 +437,15 @@ def _auth_context(
             status_code=HTTPStatus.UNAUTHORIZED, detail=str(exc)) from exc
 
 
-def _load_cors_origins() -> tuple[frozenset[str], bool]:
+def _load_cors_origins() -> tuple[frozenset[str], bool, str | None]:
+    regex = os.getenv("AD_ENGINE_CORS_ORIGIN_REGEX") or None
     raw = os.getenv("AD_ENGINE_CORS_ORIGINS")
     if raw is None:
-        return frozenset(DEFAULT_CORS_ORIGINS), False
+        return frozenset(DEFAULT_CORS_ORIGINS), False, regex
     entries = [item.strip() for item in raw.split(",") if item.strip()]
     if "*" in entries:
-        return frozenset(), True
-    return frozenset(entries), False
+        return frozenset(), True, regex
+    return frozenset(entries), False, regex
 
 
 def _campaign_export_text(campaign: dict[str, Any]) -> str:
