@@ -25,11 +25,10 @@ const IDLE_STATUS = "Ready";
 function humanizeBriefError(message: string): string {
   // The API returns raw column names (e.g. "Missing required brief fields:
   // brand_name, product_name"). Replace any whole-word key with its label.
-  return message.replace(/\b([a-z_]+)\b/g, (match) =>
-    Object.prototype.hasOwnProperty.call(BRIEF_FIELD_LABELS, match)
-      ? BRIEF_FIELD_LABELS[match]
-      : match,
-  );
+  return message.replace(/\b([a-z_]+)\b/g, (match) => {
+    const label = BRIEF_FIELD_LABELS[match];
+    return label ?? match;
+  });
 }
 
 type BriefErrors = Partial<Record<keyof CampaignBrief, string>>;
