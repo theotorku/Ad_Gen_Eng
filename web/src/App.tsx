@@ -11,7 +11,7 @@ import {
   updateCampaignVariant,
 } from "./api";
 import type { AdVariant, CampaignBrief, CampaignRecord } from "./types";
-import { EMPTY_FORM, SAMPLE_FORM } from "./constants";
+import { BRIEF_FIELD_LABELS, EMPTY_FORM, SAMPLE_FORM } from "./constants";
 import BriefForm from "./components/BriefForm";
 import CampaignList from "./components/CampaignList";
 import CampaignDetail from "./components/CampaignDetail";
@@ -19,6 +19,18 @@ import CampaignDetail from "./components/CampaignDetail";
 type ThemeMode = "light" | "dark";
 
 const THEME_STORAGE_KEY = "ad_engine_theme";
+const FAILURE_STATUS_RE = /failed/i;
+const IDLE_STATUS = "Ready";
+
+function humanizeBriefError(message: string): string {
+  // The API returns raw column names (e.g. "Missing required brief fields:
+  // brand_name, product_name"). Replace any whole-word key with its label.
+  return message.replace(/\b([a-z_]+)\b/g, (match) =>
+    Object.prototype.hasOwnProperty.call(BRIEF_FIELD_LABELS, match)
+      ? BRIEF_FIELD_LABELS[match]
+      : match,
+  );
+}
 
 function getInitialTheme(): ThemeMode {
   const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -99,14 +111,22 @@ function App() {
       setStatusMessage("Campaign generated");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create campaign.";
-      setErrorMessage(message);
+      setErrorMessage(humanizeBriefError(message));
       setStatusMessage("Generation failed");
     } finally {
       setIsCreating(false);
     }
   }
 
+  function clearFailureStatus() {
+    setStatusMessage((current) =>
+      FAILURE_STATUS_RE.test(current) ? IDLE_STATUS : current,
+    );
+    setErrorMessage((current) => (current ? null : current));
+  }
+
   async function handleSelectCampaign(campaignId: string) {
+    clearFailureStatus();
     try {
       setErrorMessage(null);
       const campaign = await fetchCampaign(campaignId);
@@ -238,6 +258,7 @@ function App() {
   }
 
   function handleFieldChange(field: keyof CampaignBrief, value: string) {
+    clearFailureStatus();
     setFormState((current) => ({ ...current, [field]: value }));
   }
 
@@ -245,11 +266,13 @@ function App() {
     field: "pain_points" | "value_props" | "constraints",
     value: string,
   ) {
+    clearFailureStatus();
     const items = value.split("\n").map((item) => item.trim()).filter(Boolean);
     setFormState((current) => ({ ...current, [field]: items }));
   }
 
   function handleChannelToggle(channel: string) {
+    clearFailureStatus();
     setFormState((current) => {
       const exists = current.channels.includes(channel);
       return {

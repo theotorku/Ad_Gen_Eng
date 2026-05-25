@@ -20,6 +20,19 @@ export const SAMPLE_FORM: CampaignBrief = {
   constraints: ["Avoid exaggerated performance claims"],
 };
 
+export const BRIEF_FIELD_LABELS: Record<string, string> = {
+  brand_name: "Brand",
+  product_name: "Product",
+  objective: "Objective",
+  target_audience: "Audience",
+  pain_points: "Pain points",
+  value_props: "Value props",
+  offer: "Offer",
+  tone: "Tone",
+  channels: "Channels",
+  constraints: "Constraints",
+};
+
 export const EMPTY_FORM: CampaignBrief = {
   brand_name: "",
   product_name: "",

@@ -394,8 +394,14 @@ textarea:focus-visible {
 .segment:hover { color: var(--ink-900); background: var(--paper-2); }
 
 .segment.active {
-  background: var(--ink-900);
-  color: var(--paper);
+  background: var(--vermilion);
+  color: var(--on-vermilion);
+  font-weight: 600;
+}
+
+.segment.active:hover {
+  background: var(--vermilion-deep);
+  color: var(--on-vermilion);
 }
 
 /* ============================================================

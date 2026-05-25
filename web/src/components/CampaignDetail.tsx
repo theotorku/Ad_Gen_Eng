@@ -76,7 +76,7 @@ function CampaignDetail({
             className="ghost-action"
             type="button"
             onClick={onReuseBrief}
-            title="Copy this campaign's brief into the New Brief form"
+            title="Reuse this brief in the New Brief form"
           >
             <ClipboardCopy size={14} />
             Reuse brief
