@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ad Generation Engine">
+  <rect width="64" height="64" rx="10" ry="10" fill="#d94e2a"/>
+  <path
+    fill="#faf6ee"
+    d="M9 53 L26 11 L38 11 L55 53 L44 53 L40.5 44 L23.5 44 L20 53 Z M26.5 36 L37.5 36 L32 22 Z"
+    fill-rule="evenodd"/>
+</svg>
