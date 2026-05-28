@@ -99,6 +99,9 @@ Common backend settings:
 - `AD_ENGINE_POSTGRES_POOL_SIZE`
 - `AD_ENGINE_REQUIRE_API_KEY`
 - `AD_ENGINE_API_KEYS`
+- `AD_ENGINE_CORS_ORIGINS` (comma-separated exact origins)
+- `AD_ENGINE_CORS_ORIGIN_REGEX` (optional regex; matches hashed Vercel preview origins)
+- `AD_ENGINE_REQUIRE_CLERK_AUTH`, `CLERK_ISSUER`, `CLERK_JWKS_URL`, `CLERK_JWT_AUDIENCE` (optional Clerk auth)
 - `AD_ENGINE_PLANNING_PROVIDER`
 - `AD_ENGINE_COPY_PROVIDER`
 - `AD_ENGINE_IMAGE_PROVIDER`
@@ -222,26 +225,40 @@ For deployed environments:
 - avoid wildcard CORS once the app is externally reachable
 - require API keys until a full user identity provider is connected
 
+`_load_cors_origins` in `src/ad_engine/fastapi_app.py` reads two env vars:
+
+- `AD_ENGINE_CORS_ORIGINS`: comma-separated exact-match origins (a single `*` allows all).
+- `AD_ENGINE_CORS_ORIGIN_REGEX`: optional regex passed to starlette `allow_origin_regex`.
+  Vercel preview deployments get a per-deploy hashed subdomain that an exact list cannot
+  cover, so set this to match them, e.g.
+  `^https://ad-gen-eng-kfso-[a-z0-9]+-theotorkus-projects\.vercel\.app$`.
+
 ## Build and Release Flow
 
-Recommended CI pipeline:
+### CI (`.github/workflows/ci.yml`)
 
-1. install dependencies
-2. run backend syntax verification
-3. run backend sample generation
-4. run frontend build
-5. deploy backend
-6. verify backend health
-7. deploy frontend
-8. run a smoke test against the deployed app
+Runs on every push and PR to `main`. Two jobs, both gating:
 
-Suggested commands:
+- **Backend (pytest)**: installs `requirements-dev.txt`, runs `python -m pytest tests/ -v`.
+  `httpx` must be in `requirements-dev.txt` — starlette's `TestClient` imports it, and
+  without it the API test modules fail at collection.
+- **Frontend (typecheck + vitest)**: `npm ci`, `npm run typecheck`, `npm run test:run`, `npm run build`.
 
-```powershell
-python -m compileall src main.py
-python main.py sample_brief.json
-npm run build
-```
+### Auto-deploy (active)
+
+Both deploy targets are GitHub-connected to `theotorku/Ad_Gen_Eng`. A push to `main`
+triggers both automatically — no manual deploy step:
+
+- **Vercel** (`ad-gen-eng-kfso`): builds the frontend from `vercel.json` (Vite preset, output `dist/`).
+- **Railway** (`ad-generation-engine`): builds the backend Dockerfile per `railway.json`,
+  and is configured to **Wait for CI**. A failing CI check holds the deploy in `WAITING`;
+  it promotes only after both CI jobs pass and the `/health` healthcheck succeeds.
+
+Manual fallback (rarely needed, e.g. CI bypass during an incident): `railway up --detach`.
+
+Connecting a GitHub repo to Railway is a dashboard-only action (GitHub App OAuth);
+the Railway CLI cannot do it. Vercel git connection can be done with
+`vercel link` + `vercel git connect <repo-url>`.
 
 Recommended smoke checks:
 
@@ -251,6 +268,32 @@ Recommended smoke checks:
 - generate image works and the variant card renders the image (blob URL)
 - save notes works
 - approve campaign works and the action button disables
+
+## Authentication (Clerk)
+
+The production frontend gates the studio behind Clerk. The production Clerk instance
+serves its Frontend API from the custom domain `clerk.proplanadengine.com`, which
+requires five CNAME records on the domain's DNS (managed in Cloudflare):
+
+| Host | Target |
+|---|---|
+| `clerk` | `frontend-api.clerk.services` |
+| `accounts` | `accounts.clerk.services` |
+| `clkmail` | `mail.<id>.clerk.services` |
+| `clk._domainkey` | `dkim1.<id>.clerk.services` |
+| `clk2._domainkey` | `dkim2.<id>.clerk.services` |
+
+DNS rules that matter:
+
+- Keep all five records **DNS-only / unproxied** (grey cloud in Cloudflare). Proxying the
+  Frontend API or DKIM records breaks Clerk.
+- **Do not enable "Flatten all CNAMEs"** in Cloudflare. Flattening returns IPs instead of
+  the CNAME target, which fails Clerk's domain verification (apex-only flattening is fine).
+- If `clerk.proplanadengine.com` does not resolve, the browser logs
+  `failed_to_load_clerk_js_timeout` / `ERR_NAME_NOT_RESOLVED` and sign-in is dead.
+
+After the records resolve, click **Verify** in the Clerk dashboard. The backend can also
+validate Clerk session JWTs — see `AD_ENGINE_REQUIRE_CLERK_AUTH` / `CLERK_*` env vars.
 
 ## Rollout Plan
 
@@ -276,7 +319,11 @@ The repo ships with concrete config for this stack:
 Live Phase 1 environment:
 
 - backend: `https://ad-generation-engine-production.up.railway.app`
-- frontend: `https://ad-gen-eng-kfso.vercel.app`
+- frontend: `https://www.proplanadengine.com` (custom domain; also `https://ad-gen-eng-kfso.vercel.app`)
+
+Deploys are now GitHub-connected and automatic on push to `main` — see
+"Build and Release Flow" above. The manual import steps below are the original
+one-time setup and the `railway up` fallback.
 
 Backend (Railway):
 
