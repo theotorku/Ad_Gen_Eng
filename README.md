@@ -233,6 +233,40 @@ $env:VITE_API_KEY = 'secret-key'
 $env:VITE_ORGANIZATION_ID = 'workspace-a'
 ```
 
+### Clerk auth with a Cloudflare-managed domain
+
+For browser authentication, create a Clerk application and add your production
+domain in Clerk. If you want Clerk to live on the same branded domain family,
+configure Clerk's custom domain records in Cloudflare DNS, then use that Clerk
+issuer on the API.
+
+Frontend:
+
+```powershell
+$env:VITE_CLERK_PUBLISHABLE_KEY = 'pk_live_...'
+$env:VITE_ORGANIZATION_ID = 'workspace-a'
+```
+
+Backend:
+
+```powershell
+$env:AD_ENGINE_REQUIRE_CLERK_AUTH = 'true'
+$env:CLERK_ISSUER = 'https://accounts.your-domain.com'
+$env:AD_ENGINE_CORS_ORIGINS = 'https://your-domain.com'
+```
+
+If your Clerk JWT template uses a custom audience, also set:
+
+```powershell
+$env:CLERK_JWT_AUDIENCE = 'ad-generation-engine'
+```
+
+The dashboard sends Clerk session JWTs as `Authorization: Bearer <token>`.
+The API validates those tokens against Clerk's JWKS and scopes records to the
+Clerk `org_id` claim when present, otherwise to the requested
+`VITE_ORGANIZATION_ID`. The old `X-API-Key` path still works for automation and
+non-browser clients.
+
 ## Good next steps
 
 Dashboard polish that has already shipped in v1.1:

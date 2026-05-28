@@ -63,7 +63,7 @@ def create_app(
         allow_origins=["*"] if allow_any else list(origins),
         allow_origin_regex=origin_regex,
         allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Organization-ID", "X-API-Key"],
+        allow_headers=["Authorization", "Content-Type", "X-Organization-ID", "X-API-Key"],
     )
 
     @app.get("/health")
@@ -73,6 +73,7 @@ def create_app(
             "providers": app.state.engine.providers.describe(),
             "db_backend": app.state.store.backend_name,
             "auth_required": app.state.auth_settings.require_api_key,
+            "clerk_auth_required": app.state.auth_settings.require_clerk_auth,
         }
 
     @app.get("/bundles")
@@ -86,8 +87,9 @@ def create_app(
         request: Request,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         payload = await _read_json_object(request)
         try:
             bundle = app.state.engine.run(payload)
@@ -107,8 +109,9 @@ def create_app(
         campaign_id: str,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         stored = app.state.store.get(
             campaign_id, organization_id=auth.organization_id
         )
@@ -123,8 +126,9 @@ def create_app(
     def list_campaigns(
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         campaigns = [
             campaign.to_dict()
             for campaign in app.state.store.list(
@@ -138,8 +142,9 @@ def create_app(
         campaign_id: str,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         stored = app.state.store.get(
             campaign_id, organization_id=auth.organization_id
         )
@@ -156,8 +161,9 @@ def create_app(
         payload: CampaignUpdateRequest,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         try:
             stored = app.state.store.update(
                 campaign_id,
@@ -183,8 +189,9 @@ def create_app(
         payload: CampaignApprovalRequest | None = None,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         stored = app.state.store.approve(
             campaign_id,
             approval_notes=payload.approval_notes if payload else None,
@@ -204,8 +211,9 @@ def create_app(
         payload: VariantUpdateRequest,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         try:
             stored = app.state.store.update_variant(
                 campaign_id,
@@ -233,8 +241,9 @@ def create_app(
         variant_index: int,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         stored = app.state.store.get(
             campaign_id, organization_id=auth.organization_id
         )
@@ -312,8 +321,9 @@ def create_app(
         campaign_id: str,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> PlainTextResponse:
-        auth = _auth_context(app, x_api_key, x_organization_id)
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
         stored = app.state.store.get(
             campaign_id, organization_id=auth.organization_id
         )
@@ -334,8 +344,9 @@ def create_app(
         filename: str,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> FileResponse:
-        _auth_context(app, x_api_key, x_organization_id)
+        _auth_context(app, x_api_key, authorization, x_organization_id)
         asset_root = get_generated_asset_root().resolve()
         asset_path = (asset_root / filename.strip()).resolve()
         if not asset_path.is_relative_to(asset_root):
@@ -353,8 +364,9 @@ def create_app(
         file: UploadFile = File(...),
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
-        _auth_context(app, x_api_key, x_organization_id)
+        _auth_context(app, x_api_key, authorization, x_organization_id)
         content = await file.read(BRAND_LOGO_MAX_BYTES + 1)
         if len(content) > BRAND_LOGO_MAX_BYTES:
             raise HTTPException(
@@ -374,8 +386,9 @@ def create_app(
         filename: str,
         x_organization_id: str | None = Header(default=None),
         x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
     ) -> FileResponse:
-        _auth_context(app, x_api_key, x_organization_id)
+        _auth_context(app, x_api_key, authorization, x_organization_id)
         asset_root = get_brand_logo_root().resolve()
         asset_path = (asset_root / filename.strip()).resolve()
         if not asset_path.is_relative_to(asset_root):
@@ -424,12 +437,14 @@ def _campaign_metadata_from_brief(payload: dict[str, Any]) -> dict[str, Any]:
 def _auth_context(
     app: FastAPI,
     api_key: str | None,
+    authorization: str | None,
     organization_id: str | None,
 ) -> AuthContext:
     try:
         return resolve_auth_context(
             settings=app.state.auth_settings,
             api_key=api_key,
+            authorization=authorization,
             requested_organization_id=organization_id,
         )
     except AuthenticationError as exc:

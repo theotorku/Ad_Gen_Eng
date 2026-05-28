@@ -198,3 +198,38 @@ def test_fastapi_required_auth_maps_key_to_workspace(monkeypatch, brief_payload)
     assert created.status_code == 201
     assert created.json()["organization_id"] == "alpha"
     assert listed.json()["count"] == 1
+
+
+def test_fastapi_required_clerk_auth_maps_token_to_workspace(monkeypatch, brief_payload):
+    import ad_engine.auth as auth_module
+
+    monkeypatch.setenv("AD_ENGINE_REQUIRE_CLERK_AUTH", "true")
+    monkeypatch.setenv("CLERK_ISSUER", "https://accounts.example.com")
+    monkeypatch.setattr(
+        auth_module,
+        "_decode_clerk_token",
+        lambda settings, token: {"sub": "user_123", "org_id": "alpha"},
+    )
+    client = _client()
+
+    missing = client.get("/campaigns", headers={"X-Organization-ID": "alpha"})
+    created = client.post(
+        "/bundles",
+        json=brief_payload,
+        headers={
+            "Authorization": "Bearer test-token",
+            "X-Organization-ID": "alpha",
+        },
+    )
+    listed = client.get(
+        "/campaigns",
+        headers={
+            "Authorization": "Bearer test-token",
+            "X-Organization-ID": "alpha",
+        },
+    )
+
+    assert missing.status_code == 401
+    assert created.status_code == 201
+    assert created.json()["organization_id"] == "alpha"
+    assert listed.json()["count"] == 1

@@ -69,7 +69,7 @@ function getInitialTheme(): ThemeMode {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function App() {
+function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [formState, setFormState] = useState<CampaignBrief>(EMPTY_FORM);
@@ -445,6 +445,16 @@ function App() {
               )}
               {isDarkMode ? "Light mode" : "Dark mode"}
             </button>
+            {onBackToLanding && (
+              <button
+                className="ghost-action"
+                type="button"
+                onClick={onBackToLanding}
+                aria-label="Back to landing page"
+              >
+                Home
+              </button>
+            )}
             <button className="ghost-action" type="button" onClick={() => void loadCampaigns()}>
               Refresh
             </button>

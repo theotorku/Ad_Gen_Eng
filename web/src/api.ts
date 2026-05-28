@@ -10,19 +10,41 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000
 const ORGANIZATION_ID = import.meta.env.VITE_ORGANIZATION_ID || "default";
 const API_KEY = import.meta.env.VITE_API_KEY;
 
-function buildHeaders(init?: RequestInit): HeadersInit {
+type AuthTokenProvider = () => Promise<string | null>;
+
+let authTokenProvider: AuthTokenProvider | null = null;
+
+export function setAuthTokenProvider(provider: AuthTokenProvider | null): void {
+  authTokenProvider = provider;
+}
+
+function buildHeaders(
+  init?: RequestInit,
+  options: { json?: boolean } = { json: true },
+  token: string | null = null,
+): HeadersInit {
   return {
-    "Content-Type": "application/json",
+    ...(options.json ? { "Content-Type": "application/json" } : {}),
     "X-Organization-ID": ORGANIZATION_ID,
     ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init?.headers ?? {}),
   };
 }
 
+async function resolveHeaders(
+  init?: RequestInit,
+  options: { json?: boolean } = { json: true },
+): Promise<HeadersInit> {
+  if (!authTokenProvider) return buildHeaders(init, options);
+  return buildHeaders(init, options, await authTokenProvider());
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = authTokenProvider ? await resolveHeaders(init) : buildHeaders(init);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: buildHeaders(init),
+    headers,
   });
 
   if (!response.ok) {
@@ -39,9 +61,10 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const headers = authTokenProvider ? await resolveHeaders(init) : buildHeaders(init);
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: buildHeaders(init),
+    headers,
   });
 
   if (!response.ok) {
@@ -119,8 +142,9 @@ export async function exportCampaignText(campaignId: string): Promise<string> {
 }
 
 export async function fetchAssetBlobUrl(path: string): Promise<string> {
+  const headers = authTokenProvider ? await resolveHeaders() : buildHeaders();
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: buildHeaders(),
+    headers,
   });
   if (!response.ok) {
     throw new Error(`Asset fetch failed with status ${response.status}`);
@@ -132,12 +156,13 @@ export async function fetchAssetBlobUrl(path: string): Promise<string> {
 export async function uploadBrandLogo(file: File): Promise<BrandLogoUploadResponse> {
   const body = new FormData();
   body.append("file", file);
+  const headerOptions = { json: false };
+  const headers = authTokenProvider
+    ? await resolveHeaders(undefined, headerOptions)
+    : buildHeaders(undefined, headerOptions);
   const response = await fetch(`${API_BASE_URL}/assets/brand-logos`, {
     method: "POST",
-    headers: {
-      "X-Organization-ID": ORGANIZATION_ID,
-      ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
-    },
+    headers,
     body,
   });
   if (!response.ok) {
