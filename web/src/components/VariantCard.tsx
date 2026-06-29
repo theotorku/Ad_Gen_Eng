@@ -244,6 +244,12 @@ function VariantCard({
       ) : (
         <>
           <h5 title={variant.headline}>{variant.headline}</h5>
+          {typeof variant.review_score === "number" ? (
+            <div className="review-score">
+              <span>Review score</span>
+              <strong>{variant.review_score}</strong>
+            </div>
+          ) : null}
           {variant.generated_asset && imageUrl ? (
             <img
               className="variant-image"
@@ -256,6 +262,14 @@ function VariantCard({
             {variant.image_error ? <p>{variant.image_error}</p> : null}
           </div>
           <p>{variant.primary_text}</p>
+          {variant.review_notes.length || variant.suggested_fixes?.length ? (
+            <div className="prompt-block">
+              <span>Review notes</span>
+              {[...variant.review_notes, ...(variant.suggested_fixes ?? [])].map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </div>
+          ) : null}
           <div className="prompt-block">
             <span>Image prompt</span>
             <p>{variant.image_prompt}</p>

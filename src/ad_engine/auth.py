@@ -35,6 +35,8 @@ class AuthContext:
     organization_id: str
     authenticated: bool
     principal_id: str | None = None
+    plan: str | None = None
+    features: frozenset[str] = frozenset()
 
 
 class AuthenticationError(Exception):
@@ -104,16 +106,22 @@ def _resolve_clerk_context(
     if not principal_id:
         raise AuthenticationError("Clerk token is missing a subject.")
 
-    claim_organization_id = _claim_as_string(claims, "org_id")
+    claim_organization_id = _organization_claim(claims)
     requested = _normalize_organization_id(requested_organization_id)
     if requested_organization_id and claim_organization_id and requested != claim_organization_id:
         raise AuthenticationError("Clerk token is not authorized for this organization.")
 
-    organization_id = claim_organization_id or requested or principal_id
+    # The token is the only trustworthy tenant signal: use its org claim, otherwise
+    # isolate to the user's own subject (personal workspace). The client-supplied
+    # requested org is deliberately NOT a fallback — trusting it would let a user with
+    # no active org reach the shared default tenant (or any org they name).
+    organization_id = claim_organization_id or principal_id
     return AuthContext(
         organization_id=_normalize_organization_id(organization_id),
         authenticated=True,
         principal_id=principal_id,
+        plan=_plan_claim(claims),
+        features=_feature_claims(claims),
     )
 
 
@@ -161,6 +169,54 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
 def _claim_as_string(claims: dict, name: str) -> str | None:
     value = claims.get(name)
     return value if isinstance(value, str) and value.strip() else None
+
+
+def _plan_claim(claims: dict) -> str | None:
+    # Clerk Billing encodes the active org plan in the `pla` claim as a
+    # comma-separated list of `scope:slug` entries (org plans prefixed `o:`).
+    # A subject holds at most one org plan, so return the first org-scoped slug.
+    # NOTE: verify this claim shape against a live Clerk Billing token, the same
+    # way org_id vs o.id was handled.
+    org_plans = _scoped_slugs(claims.get("pla"), "o")
+    if org_plans:
+        return sorted(org_plans)[0]
+    return _claim_as_string(claims, "plan")
+
+
+def _feature_claims(claims: dict) -> frozenset[str]:
+    # Clerk Billing encodes entitled features in the `fea` claim, same
+    # `scope:slug` encoding as `pla` (org features prefixed `o:`).
+    return _scoped_slugs(claims.get("fea"), "o")
+
+
+def _scoped_slugs(raw: object, scope: str) -> frozenset[str]:
+    if not isinstance(raw, str):
+        return frozenset()
+    slugs: set[str] = set()
+    for entry in raw.split(","):
+        item = entry.strip()
+        if not item:
+            continue
+        entry_scope, separator, slug = item.partition(":")
+        if separator:
+            if entry_scope.strip() == scope and slug.strip():
+                slugs.add(slug.strip())
+        else:
+            slugs.add(item)
+    return frozenset(slugs)
+
+
+def _organization_claim(claims: dict) -> str | None:
+    # Clerk's classic session token carries a flat `org_id`, while the newer v2
+    # session token nests the active organization under `o` (e.g. {"o": {"id": ...}}).
+    # Read both so tenancy resolution does not depend on the token version.
+    flat = _claim_as_string(claims, "org_id")
+    if flat:
+        return flat
+    nested = claims.get("o")
+    if isinstance(nested, dict):
+        return _claim_as_string(nested, "id")
+    return None
 
 
 def _parse_api_keys(raw: str) -> dict[str, str]:

@@ -857,6 +857,28 @@ textarea:focus-visible {
   color: var(--ink-900);
 }
 
+.fix-list {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.snippet-preview {
+  max-height: 180px;
+  overflow: auto;
+  margin: 14px 0 0;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  background: var(--paper-3);
+  color: var(--ink-800);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 /* ============================================================
    Variants — tear sheets
    ============================================================ */
@@ -997,6 +1019,26 @@ textarea:focus-visible {
   line-height: 1.45;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.review-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 18px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+
+.review-score strong {
+  color: var(--ink-900);
+  font-size: 13px;
 }
 
 .variant-item > h5 {
@@ -2100,3 +2142,79 @@ textarea:focus-visible {
   }
 }
 
+/* --- Plan usage meter + pricing --- */
+.usage-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--ink-500);
+}
+
+.usage-meter .usage-plan {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.usage-meter .usage-stat {
+  padding-left: 8px;
+  border-left: 1px solid var(--rule);
+}
+
+.usage-meter .usage-stat.capped {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.usage-meter .usage-upgrade {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--vermilion-edge);
+  border-radius: var(--radius-sm);
+  background: var(--vermilion-soft);
+  color: var(--vermilion-deep);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.usage-meter .usage-upgrade:hover {
+  background: var(--vermilion);
+  color: var(--on-vermilion);
+}
+
+.pricing-screen {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 48px 32px 64px;
+}
+
+.pricing-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.pricing-header h1 {
+  font-family: var(--font-display);
+  margin: 8px 0 12px;
+}
+
+.pricing-subhead {
+  max-width: 560px;
+  color: var(--ink-500);
+}
+
+.pricing-table-wrap {
+  margin-top: 16px;
+}

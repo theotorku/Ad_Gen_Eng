@@ -18,6 +18,9 @@ def test_engine_run_returns_complete_bundle(brief_payload):
     assert bundle.creative_plan.messaging_pillars
     assert bundle.variants
     assert bundle.quality_summary.strengths
+    assert bundle.landing_section is not None
+    assert bundle.generation_jobs
+    assert bundle.cost_summary["estimated_image_credits"] == len(bundle.variants)
 
 
 def test_engine_run_populates_image_prompts(brief_payload):

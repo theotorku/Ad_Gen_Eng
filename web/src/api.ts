@@ -4,6 +4,7 @@ import type {
   CampaignBrief,
   CampaignListResponse,
   CampaignRecord,
+  UsageSummary,
 } from "./types";
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(
@@ -28,7 +29,10 @@ function buildHeaders(
 ): HeadersInit {
   return {
     ...(options.json ? { "Content-Type": "application/json" } : {}),
-    "X-Organization-ID": ORGANIZATION_ID,
+    // When authenticating via Clerk, the token's org claim drives tenancy. Sending
+    // a hardcoded X-Organization-ID alongside it collides with that claim and the
+    // backend rejects the mismatch, so only send it in API-key/dev mode (no token).
+    ...(token ? {} : { "X-Organization-ID": ORGANIZATION_ID }),
     ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init?.headers ?? {}),
@@ -86,6 +90,10 @@ async function requestText(path: string, init?: RequestInit): Promise<string> {
 export async function fetchCampaigns(): Promise<CampaignRecord[]> {
   const payload = await requestJson<CampaignListResponse>("/campaigns");
   return payload.campaigns;
+}
+
+export async function fetchUsage(): Promise<UsageSummary> {
+  return requestJson<UsageSummary>("/usage");
 }
 
 export async function fetchCampaign(campaignId: string): Promise<CampaignRecord> {

@@ -19,6 +19,10 @@ export const SAMPLE_FORM: CampaignBrief = {
   channels: ["linkedin", "facebook", "google_search"],
   constraints: ["Avoid exaggerated performance claims"],
   brand_logo: null,
+  brand_profile: "AI-assisted campaign workspace for lean marketing teams.",
+  service_areas: [],
+  proof_points: ["Structured review workflow", "Reusable campaign briefs"],
+  banned_claims: ["Guaranteed conversion lift"],
 };
 
 export const BRIEF_FIELD_LABELS: Record<string, string> = {
@@ -33,6 +37,10 @@ export const BRIEF_FIELD_LABELS: Record<string, string> = {
   channels: "Channels",
   constraints: "Constraints",
   brand_logo: "Brand logo",
+  brand_profile: "Brand profile",
+  service_areas: "Service areas",
+  proof_points: "Proof points",
+  banned_claims: "Banned claims",
 };
 
 export const EMPTY_FORM: CampaignBrief = {
@@ -47,6 +55,10 @@ export const EMPTY_FORM: CampaignBrief = {
   channels: [],
   constraints: [],
   brand_logo: null,
+  brand_profile: "",
+  service_areas: [],
+  proof_points: [],
+  banned_claims: [],
 };
 
 export const BRAND_LOGO_MAX_BYTES = 2 * 1024 * 1024;

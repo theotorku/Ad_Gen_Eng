@@ -6,16 +6,18 @@ import {
   exportCampaignText,
   fetchCampaign,
   fetchCampaigns,
+  fetchUsage,
   generateVariantImage,
   updateCampaign,
   updateCampaignVariant,
 } from "./api";
-import type { AdVariant, CampaignBrief, CampaignRecord } from "./types";
+import type { AdVariant, CampaignBrief, CampaignRecord, UsageSummary } from "./types";
 import { BRIEF_FIELD_LABELS, EMPTY_FORM, SAMPLE_FORM } from "./constants";
 import { formatClockTime } from "./utils";
 import BriefForm from "./components/BriefForm";
 import CampaignList from "./components/CampaignList";
 import CampaignDetail from "./components/CampaignDetail";
+import UsageMeter from "./components/UsageMeter";
 
 type ThemeMode = "light" | "dark";
 
@@ -58,6 +60,10 @@ function isBriefDirty(brief: CampaignBrief): boolean {
   if (brief.value_props.length > 0) return true;
   if (brief.constraints.length > 0) return true;
   if (brief.brand_logo) return true;
+  if (brief.brand_profile?.trim()) return true;
+  if (brief.service_areas?.length) return true;
+  if (brief.proof_points?.length) return true;
+  if (brief.banned_claims?.length) return true;
   return false;
 }
 
@@ -69,8 +75,12 @@ function getInitialTheme(): ThemeMode {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
+function App({
+  onBackToLanding,
+  onShowBilling,
+}: { onBackToLanding?: () => void; onShowBilling?: () => void } = {}) {
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([]);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [formState, setFormState] = useState<CampaignBrief>(EMPTY_FORM);
   const [approvalNotes, setApprovalNotes] = useState("");
@@ -103,7 +113,16 @@ function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
 
   useEffect(() => {
     void loadCampaigns();
+    void loadUsage();
   }, []);
+
+  async function loadUsage() {
+    try {
+      setUsage(await fetchUsage());
+    } catch {
+      // Usage is informational; a failure here should not disrupt the workspace.
+    }
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -151,6 +170,7 @@ function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
       setStatusMessage("Generating campaign bundle");
       const created = await createCampaign(formState);
       await loadCampaigns(created.id);
+      void loadUsage();
       setStatusMessage("Campaign generated");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create campaign.";
@@ -281,6 +301,7 @@ function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
       setStatusMessage("Image generation failed");
     } finally {
       setGeneratingImageIndex(null);
+      void loadUsage();
     }
   }
 
@@ -328,7 +349,13 @@ function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
   }
 
   function handleListFieldChange(
-    field: "pain_points" | "value_props" | "constraints",
+    field:
+      | "pain_points"
+      | "value_props"
+      | "constraints"
+      | "service_areas"
+      | "proof_points"
+      | "banned_claims",
     value: string,
   ) {
     clearFailureStatus();
@@ -371,6 +398,10 @@ function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
       channels: [...sourceBrief.channels],
       constraints: [...sourceBrief.constraints],
       brand_logo: sourceBrief.brand_logo ?? null,
+      brand_profile: sourceBrief.brand_profile ?? "",
+      service_areas: [...(sourceBrief.service_areas ?? [])],
+      proof_points: [...(sourceBrief.proof_points ?? [])],
+      banned_claims: [...(sourceBrief.banned_claims ?? [])],
     });
     setStatusMessage(`Loaded brief from ${sourceBrief.brand_name} into the form`);
   }
@@ -420,6 +451,7 @@ function App({ onBackToLanding }: { onBackToLanding?: () => void } = {}) {
             <h2>Today&rsquo;s desk</h2>
           </div>
           <div className="header-actions">
+            <UsageMeter usage={usage} onUpgrade={onShowBilling} />
             <div className="status-chip" role="status" aria-live="polite">
               {isWorking ? (
                 <LoaderCircle className="spin" size={12} aria-hidden="true" />

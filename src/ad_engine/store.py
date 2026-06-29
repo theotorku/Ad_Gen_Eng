@@ -11,7 +11,16 @@ from threading import Lock
 from typing import Any, Protocol
 from uuid import uuid4
 
-from .models import AdBundle, CampaignBrief, CreativePlan, AdVariant, GeneratedAsset, QualitySummary
+from .models import (
+    AdBundle,
+    AdVariant,
+    CampaignBrief,
+    CreativePlan,
+    GeneratedAsset,
+    GenerationJob,
+    LandingSection,
+    QualitySummary,
+)
 
 
 CAMPAIGN_STATUSES = {"draft", "approved"}
@@ -121,12 +130,21 @@ class CampaignStore(Protocol):
     ) -> StoredCampaign | None:
         ...
 
+    def get_usage(self, organization_id: str, period: str, metric: str) -> int:
+        ...
+
+    def increment_usage(
+        self, organization_id: str, period: str, metric: str, amount: int = 1
+    ) -> int:
+        ...
+
 
 class InMemoryCampaignStore:
     backend_name = "memory"
 
     def __init__(self) -> None:
         self._items: dict[str, StoredCampaign] = {}
+        self._usage: dict[tuple[str, str, str], int] = {}
         self._lock = Lock()
 
     def create(
@@ -245,6 +263,19 @@ class InMemoryCampaignStore:
                 image_error=image_error,
             )
             return stored
+
+    def get_usage(self, organization_id: str, period: str, metric: str) -> int:
+        key = (_normalize_organization_id(organization_id), period, metric)
+        with self._lock:
+            return self._usage.get(key, 0)
+
+    def increment_usage(
+        self, organization_id: str, period: str, metric: str, amount: int = 1
+    ) -> int:
+        key = (_normalize_organization_id(organization_id), period, metric)
+        with self._lock:
+            self._usage[key] = self._usage.get(key, 0) + amount
+            return self._usage[key]
 
 
 class SQLiteCampaignStore:
@@ -564,6 +595,17 @@ class SQLiteCampaignStore:
                 connection.execute(
                     "CREATE INDEX IF NOT EXISTS idx_campaigns_org_created_at ON campaigns(organization_id, created_at DESC)"
                 )
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS usage_counters (
+                        organization_id TEXT NOT NULL,
+                        period TEXT NOT NULL,
+                        metric TEXT NOT NULL,
+                        count INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (organization_id, period, metric)
+                    )
+                    """
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.sqlite_path)
@@ -615,6 +657,40 @@ class SQLiteCampaignStore:
                 stored.campaign_id,
             ),
         )
+
+    def get_usage(self, organization_id: str, period: str, metric: str) -> int:
+        with self._lock, closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT count FROM usage_counters
+                WHERE organization_id = ? AND period = ? AND metric = ?
+                """,
+                (_normalize_organization_id(organization_id), period, metric),
+            ).fetchone()
+        return int(row["count"]) if row is not None else 0
+
+    def increment_usage(
+        self, organization_id: str, period: str, metric: str, amount: int = 1
+    ) -> int:
+        org = _normalize_organization_id(organization_id)
+        with self._lock, closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO usage_counters (organization_id, period, metric, count)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(organization_id, period, metric)
+                DO UPDATE SET count = count + excluded.count
+                """,
+                (org, period, metric, amount),
+            )
+            row = connection.execute(
+                """
+                SELECT count FROM usage_counters
+                WHERE organization_id = ? AND period = ? AND metric = ?
+                """,
+                (org, period, metric),
+            ).fetchone()
+        return int(row["count"])
 
 
 class PostgreSQLCampaignStore:
@@ -934,6 +1010,17 @@ class PostgreSQLCampaignStore:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_campaigns_org_created_at ON campaigns(organization_id, created_at DESC)"
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS usage_counters (
+                    organization_id TEXT NOT NULL,
+                    period TEXT NOT NULL,
+                    metric TEXT NOT NULL,
+                    count BIGINT NOT NULL DEFAULT 0,
+                    PRIMARY KEY (organization_id, period, metric)
+                )
+                """
+            )
 
     def _connect(self):
         return self._pool.connection()
@@ -977,6 +1064,34 @@ class PostgreSQLCampaignStore:
                 stored.campaign_id,
             ),
         )
+
+    def get_usage(self, organization_id: str, period: str, metric: str) -> int:
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT count FROM usage_counters
+                WHERE organization_id = %s AND period = %s AND metric = %s
+                """,
+                (_normalize_organization_id(organization_id), period, metric),
+            ).fetchone()
+        return int(row["count"]) if row is not None else 0
+
+    def increment_usage(
+        self, organization_id: str, period: str, metric: str, amount: int = 1
+    ) -> int:
+        org = _normalize_organization_id(organization_id)
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                """
+                INSERT INTO usage_counters (organization_id, period, metric, count)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (organization_id, period, metric)
+                DO UPDATE SET count = usage_counters.count + EXCLUDED.count
+                RETURNING count
+                """,
+                (org, period, metric, amount),
+            ).fetchone()
+        return int(row["count"])
 
 
 def build_campaign_store(settings: StoreSettings | None = None) -> CampaignStore:
@@ -1093,13 +1208,30 @@ def _stored_campaign_from_payload(payload: dict[str, Any]) -> StoredCampaign:
                 image_status=variant.get("image_status", "generated" if variant.get("generated_asset") else "prompt_only"),
                 image_error=variant.get("image_error"),
                 review_notes=list(variant.get("review_notes", [])),
+                review_score=variant.get("review_score"),
+                suggested_fixes=list(variant.get("suggested_fixes", [])),
             )
             for variant in bundle_payload["variants"]
         ],
         quality_summary=QualitySummary(
             strengths=list(quality_payload["strengths"]),
             risks=list(quality_payload["risks"]),
+            scores=dict(quality_payload.get("scores", {})),
+            suggested_fixes=list(quality_payload.get("suggested_fixes", [])),
         ),
+        landing_section=_landing_section_from_payload(bundle_payload.get("landing_section")),
+        generation_jobs=[
+            GenerationJob(
+                job_id=job["job_id"],
+                kind=job["kind"],
+                status=job["status"],
+                provider=job["provider"],
+                estimated_credits=int(job.get("estimated_credits", 0)),
+                target=job.get("target"),
+            )
+            for job in bundle_payload.get("generation_jobs", [])
+        ],
+        cost_summary=dict(bundle_payload.get("cost_summary", {})),
     )
 
     return StoredCampaign(
@@ -1149,6 +1281,18 @@ def _generated_asset_from_payload(payload: dict[str, Any] | None) -> GeneratedAs
         provider=payload["provider"],
         prompt=payload["prompt"],
         revised_prompt=payload.get("revised_prompt"),
+    )
+
+
+def _landing_section_from_payload(payload: dict[str, Any] | None) -> LandingSection | None:
+    if not payload:
+        return None
+    return LandingSection(
+        headline=payload["headline"],
+        subheadline=payload["subheadline"],
+        proof_points=list(payload["proof_points"]),
+        cta=payload["cta"],
+        html_snippet=payload["html_snippet"],
     )
 
 

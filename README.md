@@ -19,6 +19,7 @@ This repo contains a dependency-light MVP for generating structured ad bundles f
 - generates channel-specific ad variants
 - attaches image prompts
 - runs a lightweight review pass
+- produces a landing-section snippet and quality/cost metadata
 
 ## Run it
 
@@ -137,11 +138,29 @@ Invoke-RestMethod -Method Patch -Uri http://127.0.0.1:8000/campaigns/<campaign-i
 The engine now resolves generation through pluggable planning, copy, and image providers.
 
 - `AD_ENGINE_PLANNING_PROVIDER=rule_based`
+- `AD_ENGINE_PLANNING_PROVIDER=openai_responses`
 - `AD_ENGINE_COPY_PROVIDER=rule_based`
+- `AD_ENGINE_COPY_PROVIDER=openai_responses`
 - `AD_ENGINE_IMAGE_PROVIDER=prompt_template`
 - `AD_ENGINE_IMAGE_PROVIDER=openai_images`
 
 These defaults preserve the current local behavior while moving the engine onto provider interfaces. New LLM and image backends can be added by implementing the provider protocols in [src/ad_engine/providers.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/providers.py>) and registering them in `build_provider_stack()`.
+
+`openai_responses` uses the OpenAI Responses API with structured JSON outputs
+for strategy planning and copy generation. Configure it with:
+
+- `OPENAI_API_KEY`
+- `OPENAI_TEXT_MODEL=gpt-5.1`
+- `OPENAI_TEXT_TIMEOUT_SECONDS=120`
+
+Example:
+
+```powershell
+$env:AD_ENGINE_PLANNING_PROVIDER = 'openai_responses'
+$env:AD_ENGINE_COPY_PROVIDER = 'openai_responses'
+$env:OPENAI_API_KEY = 'your-api-key'
+python main.py serve
+```
 
 `openai_images` now uses the OpenAI Images API and saves generated files under `data/generated_assets` by default. Configure it with:
 

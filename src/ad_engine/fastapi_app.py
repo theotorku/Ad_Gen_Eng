@@ -18,6 +18,15 @@ from .assets import (
     save_brand_logo,
 )
 from .auth import AuthContext, AuthSettings, AuthenticationError, resolve_auth_context
+from .billing import (
+    FEATURE_IMAGE_GENERATION,
+    METRIC_CAMPAIGNS,
+    METRIC_IMAGES,
+    BillingSettings,
+    metric_allowance,
+    resolve_plan_limits,
+    usage_period,
+)
 from .config import DEFAULT_CORS_ORIGINS
 from .engine import AdGenerationEngine
 from .providers import build_provider_stack
@@ -51,11 +60,13 @@ def create_app(
     *,
     engine: AdGenerationEngine | None = None,
     store: CampaignStore | None = None,
+    billing_settings: BillingSettings | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Ad Generation Engine API", version="0.2.0")
     app.state.engine = engine or AdGenerationEngine(build_provider_stack())
     app.state.store = store or build_campaign_store(StoreSettings.from_env())
     app.state.auth_settings = AuthSettings.from_env()
+    app.state.billing_settings = billing_settings or BillingSettings.from_env()
 
     origins, allow_any, origin_regex = _load_cors_origins()
     app.add_middleware(
@@ -74,6 +85,36 @@ def create_app(
             "db_backend": app.state.store.backend_name,
             "auth_required": app.state.auth_settings.require_api_key,
             "clerk_auth_required": app.state.auth_settings.require_clerk_auth,
+            "plan_limits_enforced": app.state.billing_settings.enforce_limits,
+        }
+
+    @app.get("/usage")
+    def usage(
+        x_organization_id: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, Any]:
+        auth = _auth_context(app, x_api_key, authorization, x_organization_id)
+        settings = app.state.billing_settings
+        limits = resolve_plan_limits(auth.plan, default_plan=settings.default_plan)
+        period = usage_period()
+        return {
+            "plan": auth.plan or settings.default_plan,
+            "period": period,
+            "enforced": settings.enforce_limits,
+            "usage": {
+                METRIC_IMAGES: app.state.store.get_usage(
+                    auth.organization_id, period, METRIC_IMAGES
+                ),
+                METRIC_CAMPAIGNS: app.state.store.get_usage(
+                    auth.organization_id, period, METRIC_CAMPAIGNS
+                ),
+            },
+            "limits": {
+                METRIC_IMAGES: limits.images_per_month,
+                METRIC_CAMPAIGNS: limits.campaigns_per_month,
+            },
+            "features": sorted(limits.features),
         }
 
     @app.get("/bundles")
@@ -90,6 +131,7 @@ def create_app(
         authorization: str | None = Header(default=None),
     ) -> dict[str, Any]:
         auth = _auth_context(app, x_api_key, authorization, x_organization_id)
+        _enforce_plan_limit(app, auth, METRIC_CAMPAIGNS)
         payload = await _read_json_object(request)
         try:
             bundle = app.state.engine.run(payload)
@@ -102,6 +144,9 @@ def create_app(
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST, detail=str(exc)) from exc
 
+        app.state.store.increment_usage(
+            auth.organization_id, usage_period(), METRIC_CAMPAIGNS
+        )
         return stored.to_dict()
 
     @app.get("/bundles/{campaign_id}")
@@ -267,6 +312,9 @@ def create_app(
                 detail="Image generation requires AD_ENGINE_IMAGE_PROVIDER=openai_images.",
             )
 
+        _enforce_feature(app, auth, FEATURE_IMAGE_GENERATION)
+        _enforce_plan_limit(app, auth, METRIC_IMAGES)
+
         app.state.store.update_variant_image(
             campaign_id,
             variant_index,
@@ -287,6 +335,9 @@ def create_app(
                 organization_id=auth.organization_id,
                 image_status="generated",
                 generated_asset=asset,
+            )
+            app.state.store.increment_usage(
+                auth.organization_id, usage_period(), METRIC_IMAGES
             )
         except ValueError as exc:
             updated = app.state.store.update_variant_image(
@@ -452,6 +503,42 @@ def _auth_context(
             status_code=HTTPStatus.UNAUTHORIZED, detail=str(exc)) from exc
 
 
+def _enforce_plan_limit(app: FastAPI, auth: AuthContext, metric: str) -> None:
+    settings = app.state.billing_settings
+    if not settings.enforce_limits:
+        return
+    limits = resolve_plan_limits(auth.plan, default_plan=settings.default_plan)
+    allowance = metric_allowance(limits, metric)
+    if allowance is None:
+        return  # Unlimited (fair use).
+    used = app.state.store.get_usage(auth.organization_id, usage_period(), metric)
+    if used >= allowance:
+        plan = auth.plan or settings.default_plan
+        raise HTTPException(
+            status_code=HTTPStatus.PAYMENT_REQUIRED,
+            detail=(
+                f"Monthly {metric} limit reached for the {plan} plan "
+                f"({allowance}). Upgrade your workspace plan to generate more."
+            ),
+        )
+
+
+def _enforce_feature(app: FastAPI, auth: AuthContext, feature: str) -> None:
+    settings = app.state.billing_settings
+    if not settings.enforce_limits:
+        return
+    limits = resolve_plan_limits(auth.plan, default_plan=settings.default_plan)
+    if feature not in limits.features:
+        plan = auth.plan or settings.default_plan
+        raise HTTPException(
+            status_code=HTTPStatus.PAYMENT_REQUIRED,
+            detail=(
+                f"The {feature.replace('_', ' ')} feature is not included in the "
+                f"{plan} plan. Upgrade your workspace plan to enable it."
+            ),
+        )
+
+
 def _load_cors_origins() -> tuple[frozenset[str], bool, str | None]:
     regex = os.getenv("AD_ENGINE_CORS_ORIGIN_REGEX") or None
     raw = os.getenv("AD_ENGINE_CORS_ORIGINS")
@@ -492,6 +579,22 @@ def _campaign_export_text(campaign: dict[str, Any]) -> str:
                 f"Primary text: {variant['primary_text']}",
                 f"CTA: {variant['cta']}",
                 f"Image prompt: {variant['image_prompt']}",
+            ]
+        )
+
+    landing = bundle.get("landing_section")
+    if landing:
+        lines.extend(
+            [
+                "",
+                "Landing section",
+                f"Headline: {landing['headline']}",
+                f"Subheadline: {landing['subheadline']}",
+                f"CTA: {landing['cta']}",
+                "Proof points:",
+                *[f"- {point}" for point in landing["proof_points"]],
+                "",
+                landing["html_snippet"],
             ]
         )
 

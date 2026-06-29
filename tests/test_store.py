@@ -237,3 +237,30 @@ def test_sqlite_update_variant_persists(bundle, local_tmp_path):
 
     assert fetched is not None
     assert fetched.bundle.variants[0].headline == "Edited headline"
+
+
+def test_inmemory_usage_counter_increments_and_isolates_by_org():
+    store = InMemoryCampaignStore()
+
+    assert store.get_usage("alpha", "2026-03", "images") == 0
+    assert store.increment_usage("alpha", "2026-03", "images") == 1
+    assert store.increment_usage("alpha", "2026-03", "images", amount=2) == 3
+
+    # Different org, period, and metric are independent counters.
+    assert store.get_usage("beta", "2026-03", "images") == 0
+    assert store.get_usage("alpha", "2026-04", "images") == 0
+    assert store.get_usage("alpha", "2026-03", "campaigns") == 0
+    assert store.get_usage("alpha", "2026-03", "images") == 3
+
+
+def test_sqlite_usage_counter_persists(local_tmp_path):
+    db_path = str(local_tmp_path / "ad_engine.db")
+    store = SQLiteCampaignStore(db_path)
+
+    store.increment_usage("alpha", "2026-03", "images")
+    store.increment_usage("alpha", "2026-03", "images", amount=4)
+
+    fresh = SQLiteCampaignStore(db_path)
+
+    assert fresh.get_usage("alpha", "2026-03", "images") == 5
+    assert fresh.get_usage("beta", "2026-03", "images") == 0

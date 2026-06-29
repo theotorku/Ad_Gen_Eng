@@ -2,11 +2,40 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from ad_engine.billing import BillingSettings
 from ad_engine.engine import AdGenerationEngine
 from ad_engine.fastapi_app import create_app
 from ad_engine.models import GeneratedAsset
 from ad_engine.providers import build_provider_stack
 from ad_engine.store import InMemoryCampaignStore
+
+
+class _FakeImages:
+    provider_name = "fake_images"
+
+    def attach_image_prompts(self, brief, variants):
+        for variant in variants:
+            variant.image_prompt = "Fake prompt."
+
+    def generate_variant_image(self, brief, variant, *, index=1):
+        return GeneratedAsset(
+            path="/generated-assets/fake.png",
+            mime_type="image/png",
+            provider="openai_images",
+            prompt=variant.image_prompt,
+        )
+
+
+def _enforced_client(image_provider=None, default_plan="free") -> TestClient:
+    providers = build_provider_stack()
+    if image_provider is not None:
+        providers.image = image_provider
+    app = create_app(
+        engine=AdGenerationEngine(providers),
+        store=InMemoryCampaignStore(),
+        billing_settings=BillingSettings(enforce_limits=True, default_plan=default_plan),
+    )
+    return TestClient(app)
 
 
 def _client(image_provider=None) -> TestClient:
@@ -233,3 +262,69 @@ def test_fastapi_required_clerk_auth_maps_token_to_workspace(monkeypatch, brief_
     assert created.status_code == 201
     assert created.json()["organization_id"] == "alpha"
     assert listed.json()["count"] == 1
+
+
+def test_usage_endpoint_tracks_counts_when_enforcement_off(brief_payload):
+    # Usage is always tracked; enforcement only gates. With the default client
+    # (enforcement off) the counter still advances so data exists at cutover.
+    client = _client()
+    client.post("/bundles", json=brief_payload)
+
+    usage = client.get("/usage").json()
+
+    assert usage["enforced"] is False
+    assert usage["plan"] == "free"
+    assert usage["usage"]["campaigns"] == 1
+    assert usage["limits"]["campaigns"] == 3
+
+
+def test_free_plan_blocks_image_generation_feature(brief_payload):
+    client = _enforced_client(image_provider=_FakeImages(), default_plan="free")
+    campaign_id = client.post("/bundles", json=brief_payload).json()["id"]
+
+    response = client.post(f"/campaigns/{campaign_id}/variants/0/generate-image")
+
+    assert response.status_code == 402
+    assert "image generation" in response.json()["detail"].lower()
+
+
+def test_free_plan_caps_campaign_creation(brief_payload):
+    client = _enforced_client(default_plan="free")
+
+    for _ in range(3):
+        assert client.post("/bundles", json=brief_payload).status_code == 201
+    blocked = client.post("/bundles", json=brief_payload)
+
+    assert blocked.status_code == 402
+    assert "campaigns" in blocked.json()["detail"].lower()
+
+
+def test_pro_plan_allows_image_generation_and_tracks_usage(monkeypatch, brief_payload):
+    import ad_engine.auth as auth_module
+
+    monkeypatch.setenv("AD_ENGINE_REQUIRE_CLERK_AUTH", "true")
+    monkeypatch.setenv("CLERK_ISSUER", "https://accounts.example.com")
+    monkeypatch.setattr(
+        auth_module,
+        "_decode_clerk_token",
+        lambda settings, token: {
+            "sub": "user_1",
+            "org_id": "alpha",
+            "pla": "o:pro",
+            "fea": "o:image_generation",
+        },
+    )
+    client = _enforced_client(image_provider=_FakeImages())
+    headers = {"Authorization": "Bearer t"}
+
+    campaign_id = client.post("/bundles", json=brief_payload, headers=headers).json()["id"]
+    generated = client.post(
+        f"/campaigns/{campaign_id}/variants/0/generate-image", headers=headers
+    )
+    usage = client.get("/usage", headers=headers).json()
+
+    assert generated.status_code == 200
+    assert usage["plan"] == "pro"
+    assert usage["limits"]["images"] == 150
+    assert usage["usage"]["images"] == 1
+    assert usage["usage"]["campaigns"] == 1

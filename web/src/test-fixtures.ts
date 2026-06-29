@@ -47,6 +47,9 @@ export function buildCampaign(overrides: Partial<CampaignRecord> = {}): Campaign
       },
       variants: [sampleVariant],
       quality_summary: { strengths: [], risks: [] },
+      landing_section: null,
+      generation_jobs: [],
+      cost_summary: {},
     },
     ...overrides,
   };

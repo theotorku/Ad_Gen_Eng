@@ -47,10 +47,20 @@ The current defaults are local implementations:
 - `rule_based` copy
 - `prompt_template` image prompts
 
+Registered text provider options currently include:
+
+- `rule_based`
+- `openai_responses`
+
 Registered image provider options currently include:
 
 - `prompt_template`
 - `openai_images`
+
+When `openai_responses` is active for planning and/or copy, the provider calls
+the OpenAI Responses API and requests schema-constrained JSON matching the
+engine's domain models. The rule-based path remains the deterministic default
+for local development and tests.
 
 When `openai_images` is active, campaign creation still attaches image prompts by default. Real images are generated per variant through the API/dashboard using GPT Image 2, then saved locally with a generated asset reference on the variant. Those files are served by the API through `/generated-assets/...`. Bulk image generation during campaign creation is available only when `OPENAI_IMAGE_GENERATE_DURING_CREATE=true`.
 
@@ -70,6 +80,12 @@ OpenAI image generation is configured with:
 - `OPENAI_IMAGE_OUTPUT_FORMAT`
 - `OPENAI_IMAGE_OUTPUT_DIR`
 - `OPENAI_IMAGE_GENERATE_DURING_CREATE`
+
+OpenAI text generation is configured with:
+
+- `OPENAI_API_KEY`
+- `OPENAI_TEXT_MODEL` defaults to `gpt-5.1`
+- `OPENAI_TEXT_TIMEOUT_SECONDS`
 
 New providers should implement the relevant protocol in [providers.py](</c:/Users/TheoTorku/OneDrive/Desktop/march 2026/Ad_Generation Engine/src/ad_engine/providers.py>) and then be registered in `build_provider_stack()`.
 

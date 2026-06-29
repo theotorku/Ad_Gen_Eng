@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import React from "react";
 import {
   ClerkProvider,
+  OrganizationSwitcher,
   SignInButton,
   SignedIn,
   SignedOut,
@@ -12,13 +13,14 @@ import ReactDOM from "react-dom/client";
 import { setAuthTokenProvider } from "./api";
 import App from "./App";
 import LandingPage from "./components/LandingPage";
+import PricingPage from "./components/PricingPage";
 import "./styles.css";
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 function ClerkAppShell() {
   const { getToken, isLoaded } = useAuth();
-  const [view, setView] = useState<"landing" | "studio">("landing");
+  const [view, setView] = useState<"landing" | "studio" | "billing">("landing");
 
   useEffect(() => {
     setAuthTokenProvider(async () => {
@@ -70,9 +72,29 @@ function ClerkAppShell() {
           >
             Home
           </button>
+          <button
+            className="ghost-action"
+            type="button"
+            onClick={() => setView("billing")}
+            style={{ minHeight: "32px", fontSize: "12.5px" }}
+          >
+            Plans
+          </button>
+          <OrganizationSwitcher
+            hidePersonal={false}
+            afterSelectOrganizationUrl="/"
+            afterSelectPersonalUrl="/"
+          />
           <UserButton />
         </div>
-        <App onBackToLanding={() => setView("landing")} />
+        {view === "billing" ? (
+          <PricingPage onBack={() => setView("studio")} />
+        ) : (
+          <App
+            onBackToLanding={() => setView("landing")}
+            onShowBilling={() => setView("billing")}
+          />
+        )}
       </SignedIn>
     </>
   );

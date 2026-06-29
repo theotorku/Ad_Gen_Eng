@@ -135,6 +135,50 @@ function CampaignDetail({
         </section>
       </div>
 
+      <div className="detail-columns">
+        <section className="detail-section">
+          <h4>Quality gate</h4>
+          <div className="metric-strip">
+            <div>
+              <span>Avg score</span>
+              <strong>
+                {campaign.bundle.quality_summary.scores?.average_variant_score ?? "N/A"}
+              </strong>
+            </div>
+            <div>
+              <span>Checks</span>
+              <strong>{campaign.bundle.quality_summary.risks.length}</strong>
+            </div>
+          </div>
+          <ul className="tag-list">
+            {campaign.bundle.quality_summary.risks.map((risk) => (
+              <li key={risk}>{risk}</li>
+            ))}
+          </ul>
+          {campaign.bundle.quality_summary.suggested_fixes?.length ? (
+            <ul className="fix-list">
+              {campaign.bundle.quality_summary.suggested_fixes.map((fix) => (
+                <li key={fix}>{fix}</li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+
+        {campaign.bundle.landing_section ? (
+          <section className="detail-section">
+            <h4>Landing section</h4>
+            <p>{campaign.bundle.landing_section.headline}</p>
+            <p>{campaign.bundle.landing_section.subheadline}</p>
+            <ul className="tag-list">
+              {campaign.bundle.landing_section.proof_points.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+            <pre className="snippet-preview">{campaign.bundle.landing_section.html_snippet}</pre>
+          </section>
+        ) : null}
+      </div>
+
       <section className="variants-section">
         <div className="section-marker">
           <span className="num">03 /</span>

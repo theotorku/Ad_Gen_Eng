@@ -60,15 +60,18 @@ class ProviderStack:
 def build_provider_stack(settings: ProviderSettings | None = None) -> ProviderStack:
     from .assets import OpenAIImagesProvider, PromptTemplateImageProvider
     from .copywriter import RuleBasedCopyProvider
+    from .openai_responses import OpenAIResponsesCopyProvider, OpenAIResponsesPlanningProvider
     from .planner import RuleBasedPlanningProvider
 
     resolved = settings or ProviderSettings.from_env()
 
     planning_registry: dict[str, type[PlanningProvider]] = {
         "rule_based": RuleBasedPlanningProvider,
+        "openai_responses": OpenAIResponsesPlanningProvider,
     }
     copy_registry: dict[str, type[CopyProvider]] = {
         "rule_based": RuleBasedCopyProvider,
+        "openai_responses": OpenAIResponsesCopyProvider,
     }
     image_registry: dict[str, type[ImageProvider]] = {
         "prompt_template": PromptTemplateImageProvider,

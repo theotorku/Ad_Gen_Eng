@@ -33,6 +33,10 @@ class CampaignBrief:
     channels: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
     brand_logo: str | None = None
+    brand_profile: str | None = None
+    service_areas: list[str] = field(default_factory=list)
+    proof_points: list[str] = field(default_factory=list)
+    banned_claims: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "CampaignBrief":
@@ -49,6 +53,10 @@ class CampaignBrief:
             channels=_normalize_list(payload.get("channels")),
             constraints=_normalize_list(payload.get("constraints")),
             brand_logo=_normalize_brand_logo(payload.get("brand_logo")),
+            brand_profile=_normalize_optional_text(payload.get("brand_profile")),
+            service_areas=_normalize_list(payload.get("service_areas")),
+            proof_points=_normalize_list(payload.get("proof_points")),
+            banned_claims=_normalize_list(payload.get("banned_claims")),
         )
         brief.validate()
         return brief
@@ -95,10 +103,18 @@ class CampaignBrief:
         if self.brand_logo is not None:
             _validate_brand_logo_path(self.brand_logo)
 
+        if self.brand_profile is not None and len(self.brand_profile) > MAX_OFFER_LENGTH:
+            raise ValueError(
+                f"Field 'brand_profile' exceeds maximum length of {MAX_OFFER_LENGTH} characters."
+            )
+
         for list_name, items in (
             ("pain_points", self.pain_points),
             ("value_props", self.value_props),
             ("constraints", self.constraints),
+            ("service_areas", self.service_areas),
+            ("proof_points", self.proof_points),
+            ("banned_claims", self.banned_claims),
         ):
             if len(items) > MAX_LIST_ITEMS:
                 raise ValueError(
@@ -150,6 +166,8 @@ class AdVariant:
     image_status: str = "prompt_only"
     image_error: str | None = None
     review_notes: list[str] = field(default_factory=list)
+    review_score: int | None = None
+    suggested_fixes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -159,6 +177,33 @@ class AdVariant:
 class QualitySummary:
     strengths: list[str]
     risks: list[str]
+    scores: dict[str, int] = field(default_factory=dict)
+    suggested_fixes: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class LandingSection:
+    headline: str
+    subheadline: str
+    proof_points: list[str]
+    cta: str
+    html_snippet: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class GenerationJob:
+    job_id: str
+    kind: str
+    status: str
+    provider: str
+    estimated_credits: int = 0
+    target: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -170,6 +215,9 @@ class AdBundle:
     creative_plan: CreativePlan
     variants: list[AdVariant]
     quality_summary: QualitySummary
+    landing_section: LandingSection | None = None
+    generation_jobs: list[GenerationJob] = field(default_factory=list)
+    cost_summary: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -177,6 +225,9 @@ class AdBundle:
             "creative_plan": self.creative_plan.to_dict(),
             "variants": [variant.to_dict() for variant in self.variants],
             "quality_summary": self.quality_summary.to_dict(),
+            "landing_section": self.landing_section.to_dict() if self.landing_section else None,
+            "generation_jobs": [job.to_dict() for job in self.generation_jobs],
+            "cost_summary": self.cost_summary,
         }
 
 

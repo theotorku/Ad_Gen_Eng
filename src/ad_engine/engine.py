@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from .models import AdBundle, CampaignBrief
+from uuid import uuid4
+
+from .landing import build_landing_section
+from .models import AdBundle, CampaignBrief, GenerationJob
 from .providers import ProviderStack, build_provider_stack
 from .review import review_variants
 
@@ -15,9 +18,26 @@ class AdGenerationEngine:
         variants = self.providers.copy.generate_variants(brief, plan)
         self.providers.image.attach_image_prompts(brief, variants)
         quality_summary = review_variants(brief, variants)
+        landing_section = build_landing_section(brief, variants)
+        generation_jobs = [
+            GenerationJob(
+                job_id=f"job_{uuid4().hex[:12]}",
+                kind="image_generation",
+                status="available",
+                provider=self.providers.image.provider_name,
+                estimated_credits=len(variants),
+                target="all_variants",
+            )
+        ]
         return AdBundle(
             brief=brief,
             creative_plan=plan,
             variants=variants,
             quality_summary=quality_summary,
+            landing_section=landing_section,
+            generation_jobs=generation_jobs,
+            cost_summary={
+                "estimated_image_credits": len(variants),
+                "image_model": getattr(self.providers.image, "model", None),
+            },
         )

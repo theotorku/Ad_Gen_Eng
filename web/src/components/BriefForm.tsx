@@ -8,7 +8,13 @@ import {
   CHANNEL_OPTIONS,
 } from "../constants";
 
-type ListField = "pain_points" | "value_props" | "constraints";
+type ListField =
+  | "pain_points"
+  | "value_props"
+  | "constraints"
+  | "service_areas"
+  | "proof_points"
+  | "banned_claims";
 
 type BriefFormProps = {
   formState: CampaignBrief;
@@ -265,6 +271,44 @@ function BriefForm({
             rows={3}
             value={formState.constraints.join("\n")}
             onChange={(event) => onListFieldChange("constraints", event.target.value)}
+          />
+        </label>
+
+        <label>
+          <span>Brand profile</span>
+          <textarea
+            rows={3}
+            value={formState.brand_profile ?? ""}
+            onChange={(event) => onFieldChange("brand_profile", event.target.value)}
+          />
+        </label>
+
+        <div className="field-grid">
+          <label>
+            <span>Service areas</span>
+            <textarea
+              rows={3}
+              value={(formState.service_areas ?? []).join("\n")}
+              onChange={(event) => onListFieldChange("service_areas", event.target.value)}
+            />
+          </label>
+
+          <label>
+            <span>Proof points</span>
+            <textarea
+              rows={3}
+              value={(formState.proof_points ?? []).join("\n")}
+              onChange={(event) => onListFieldChange("proof_points", event.target.value)}
+            />
+          </label>
+        </div>
+
+        <label>
+          <span>Banned claims</span>
+          <textarea
+            rows={3}
+            value={(formState.banned_claims ?? []).join("\n")}
+            onChange={(event) => onListFieldChange("banned_claims", event.target.value)}
           />
         </label>
 

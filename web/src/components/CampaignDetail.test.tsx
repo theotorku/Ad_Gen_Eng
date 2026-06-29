@@ -66,6 +66,26 @@ describe("CampaignDetail", () => {
     expect(screen.getByText("Ship campaigns in hours, not weeks")).toBeInTheDocument();
   });
 
+  it("renders the generated landing section when present", () => {
+    renderDetail({
+      campaign: buildCampaign({
+        bundle: {
+          ...buildCampaign().bundle,
+          landing_section: {
+            headline: "Book the faster campaign path",
+            subheadline: "Launch stronger local ads without the lag.",
+            proof_points: ["Local proof", "Clear offer"],
+            cta: "Book Now",
+            html_snippet: "<section><h2>Book the faster campaign path</h2></section>",
+          },
+        },
+      }),
+    });
+
+    expect(screen.getByText("Landing section")).toBeInTheDocument();
+    expect(screen.getByText("Book the faster campaign path")).toBeInTheDocument();
+  });
+
   it("calls onApprove when the approve button is clicked", async () => {
     const props = renderDetail();
 
